@@ -1,0 +1,51 @@
+{
+    "name": "brewless/laravel",
+    "description": "What a Laravel application needs to run on Brewless: the release, schedule and queue routes its own containers answer on, and trust in the edge in front of it.",
+    "keywords": ["brewless", "laravel", "serverless", "deploy"],
+    "homepage": "https://brewless.eu",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Coding Agency",
+            "homepage": "https://coding.agency"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "illuminate/console": "^12.0 || ^13.0",
+        "illuminate/contracts": "^12.0 || ^13.0",
+        "illuminate/http": "^12.0 || ^13.0",
+        "illuminate/routing": "^12.0 || ^13.0",
+        "illuminate/support": "^12.0 || ^13.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.30",
+        "orchestra/testbench": "^10.0 || ^11.0",
+        "pestphp/pest": "^4.0 || ^5.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Brewless\\Laravel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Brewless\\Laravel\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Brewless\\Laravel\\BrewlessServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
