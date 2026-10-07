@@ -53,4 +53,19 @@ return [
         // Domains that are yours. A hostname is believed when it is one of these or a subdomain of one.
         'domains' => array_values(array_filter(explode(',', (string) env('BREWLESS_DOMAINS', (string) parse_url((string) env('APP_URL', ''), PHP_URL_HOST))))),
     ],
+
+    /*
+    | A queue at Scaleway Queues.
+    |
+    | Scaleway's queues speak SQS but take a key of their own, not the key
+    | your files in Object Storage are read with. Laravel's `sqs` connection
+    | reads the same AWS_* names as its `s3` disk, so the queue's key travels
+    | under names of its own and is handed to that connection here. Without
+    | them the connection is left as your application configured it.
+    */
+    'queue' => [
+        'key' => env('SQS_ACCESS_KEY_ID'),
+        'secret' => env('SQS_SECRET_ACCESS_KEY'),
+        'endpoint' => env('SQS_ENDPOINT'),
+    ],
 ];

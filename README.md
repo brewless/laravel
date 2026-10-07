@@ -54,6 +54,7 @@ Calling the container directly with a made-up hostname changes nothing.
 | `BREWLESS_EDGE_SECRET` | The secret the edge adds to every request |
 | `BREWLESS_DOMAINS` | Comma-separated domains that are yours |
 | `BREWLESS_HEARTBEAT_STORE` | Cache store for the sign of life (`file`) |
+| `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY`, `SQS_ENDPOINT` | The key and address of a queue at Scaleway Queues; handed to the `sqs` connection, which otherwise shares `AWS_*` with the `s3` disk |
 | `RELEASE` | The running image; set by Brewless on each release |
 
 Other release commands, queue time and tries:
