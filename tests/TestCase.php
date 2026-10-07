@@ -52,6 +52,7 @@ abstract class TestCase extends Testbench
     protected function defineRoutes($router): void
     {
         Route::get('/host', fn (): string => request()->getHost().'|'.(request()->headers->has('X-Brewless-Edge') ? 'secret-visible' : 'secret-gone'));
+        Route::get('/address', fn (): string => 'forwarded:'.request()->headers->get('X-Forwarded-For', 'nothing'));
     }
 
     /**

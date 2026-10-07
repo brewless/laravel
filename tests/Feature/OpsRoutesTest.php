@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use Brewless\Laravel\BrewlessServiceProvider;
 use Brewless\Laravel\Ops\Heartbeat;
 use Brewless\Laravel\Tests\TestCase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -121,4 +123,57 @@ test('a command that never ends, is unknown or is not one line does not run', fu
     $this->postJson('/_ops/command', ['command' => 'nope:nothing'], $this->ops())->assertOk()->assertJsonPath('exit_code', 1)->assertJsonPath('refused', false);
     $this->postJson('/_ops/command', ['command' => "about\nmigrate:fresh"], $this->ops())->assertUnprocessable();
     $this->postJson('/_ops/command', [], $this->ops())->assertUnprocessable();
+});
+
+test('an address that keeps guessing the secret is shut out, with the same 404', function (): void {
+    foreach (range(1, 10) as $guess) {
+        $this->getJson('/_ops/status', ['X-Brewless-Ops' => 'guess-'.$guess])->assertNotFound();
+    }
+
+    // The right secret no longer helps this address for a minute; another address is unaffected.
+    $this->getJson('/_ops/status', $this->ops())->assertNotFound();
+    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])->getJson('/_ops/status', $this->ops())->assertOk();
+
+    $this->travel(61)->seconds();
+    $this->withServerVariables([])->getJson('/_ops/status', $this->ops())->assertOk();
+});
+
+test('a command that throws data away does not run over http', function (): void {
+    foreach (['db:wipe --force', 'migrate:fresh --force', 'migrate:reset', 'migrate:rollback --step=1'] as $destructive) {
+        $this->postJson('/_ops/command', ['command' => $destructive], $this->ops())
+            ->assertOk()
+            ->assertJsonPath('refused', true)
+            ->assertJsonPath('exit_code', 1)
+            ->assertSee('throws data away');
+    }
+
+    config(['brewless.ops.destructive' => ['shop:purge']]);
+
+    $this->postJson('/_ops/command', ['command' => 'shop:purge'], $this->ops())->assertJsonPath('refused', true);
+});
+
+test('a job that is due is worked in the tick, one that is not due does not start a worker', function (): void {
+    dispatch(function (): void {
+        Cache::put('ran-too-early', true);
+    })->delay(now()->addMinutes(10));
+
+    $this->postJson('/', ['secret' => TestCase::OPS_SECRET, 'task' => 'tick'])->assertOk()->assertJsonPath('queue.output', '');
+
+    expect(Cache::get('ran-too-early'))->toBeNull();
+
+    $this->travel(11)->minutes();
+    $this->postJson('/', ['secret' => TestCase::OPS_SECRET, 'task' => 'tick'])->assertOk();
+
+    expect(Cache::get('ran-too-early'))->toBeTrue();
+});
+
+test('an application names only the settings it changes', function (): void {
+    config(['brewless.ops' => ['release_commands' => ['migrate --force', 'shop:warm']]]);
+
+    (new BrewlessServiceProvider($this->app))->register();
+
+    expect(config('brewless.ops.release_commands'))->toBe(['migrate --force', 'shop:warm'])
+        ->and(config('brewless.ops.secret_header'))->toBe('X-Brewless-Ops')
+        ->and(config('brewless.ops.never_ending'))->toContain('tinker')
+        ->and(config('brewless.edge.host_header'))->toBe('Cdn-Host');
 });

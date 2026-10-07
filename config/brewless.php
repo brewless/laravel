@@ -20,6 +20,9 @@ return [
         'secret' => env('BREWLESS_OPS_SECRET'),
         'secret_header' => 'X-Brewless-Ops',
 
+        // Wrong secrets an address may give per minute. After that it gets the same 404 for a minute, right or wrong.
+        'max_failures' => 10,
+
         // What runs before a release goes live, in this order. If one fails, the release does not go live.
         'release_commands' => ['migrate --force'],
 
@@ -33,6 +36,9 @@ return [
 
         // Console commands that never return. Asked for through Brewless, they are refused.
         'never_ending' => ['tinker', 'serve', 'queue:work', 'queue:listen', 'schedule:work', 'pail', 'reverb:start', 'horizon', 'octane:start', 'dev'],
+
+        // Console commands that throw data away. That is a step someone takes on purpose, at the console, never a side effect of a request.
+        'destructive' => ['db:wipe', 'migrate:fresh', 'migrate:refresh', 'migrate:reset', 'migrate:rollback'],
     ],
 
     /*
@@ -44,11 +50,21 @@ return [
     | that header only together with the secret the edge adds, and only for
     | the domains listed here, so nobody can choose a hostname by calling the
     | container directly.
+    |
+    | The same goes for the visitor's address. Every proxy appends what it saw
+    | to X-Forwarded-For and a visitor can put anything in front, so with an
+    | edge secret set only the entry the edge appended counts, and a request
+    | without the secret loses the header altogether.
     */
     'edge' => [
         'secret' => env('BREWLESS_EDGE_SECRET'),
         'secret_header' => 'X-Brewless-Edge',
         'host_header' => 'Cdn-Host',
+
+        // How many proxies append to X-Forwarded-For between the visitor and
+        // the container: the edge itself, plus whatever stands in front of the
+        // container. The visitor's address is that many from the end.
+        'hops' => (int) env('BREWLESS_EDGE_HOPS', 1),
 
         // Domains that are yours. A hostname is believed when it is one of these or a subdomain of one.
         'domains' => array_values(array_filter(explode(',', (string) env('BREWLESS_DOMAINS', (string) parse_url((string) env('APP_URL', ''), PHP_URL_HOST))))),

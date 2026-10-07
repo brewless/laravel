@@ -19,6 +19,9 @@ final class Runtime
 {
     private const int OUTPUT_LIMIT = 100_000;
 
+    /** Above what a container can hold, so the worker's memory guard never cuts a tick short. */
+    private const int MEMORY_MB = 4096;
+
     /**
      * Run the release commands in order. An exception stops the release.
      *
@@ -64,10 +67,20 @@ final class Runtime
         // The queue was looked at; that is the sign of life, whether or not there was work.
         Heartbeat::beat(Heartbeat::QUEUE);
 
+        // Nothing due: do not start a worker. Starting one costs a dozen
+        // queries on the cache and jobs tables just to find the queue empty.
+        if (! $this->hasWork()) {
+            return ['output' => '', 'seconds' => round(microtime(true) - $started, 2)];
+        }
+
         Artisan::call('queue:work', [
             '--stop-when-empty' => true,
             '--max-time' => (int) config('brewless.ops.queue_seconds'),
             '--tries' => (int) config('brewless.ops.queue_tries'),
+            // The worker stops after a job once the process is over its memory limit,
+            // and would leave the rest of the queue waiting. That guard is for a
+            // daemon that never restarts; this one ends with the request anyway.
+            '--memory' => self::MEMORY_MB,
             '--no-interaction' => true,
         ]);
 
@@ -135,8 +148,8 @@ final class Runtime
     }
 
     /**
-     * Run one console command. It never asks a question, and one that never
-     * ends by itself is refused.
+     * Run one console command. It never asks a question; one that never ends
+     * by itself and one that throws data away are refused.
      *
      * @return array{exit_code: int, output: string, seconds: float, refused: bool}
      */
@@ -147,6 +160,10 @@ final class Runtime
 
         if ($name === '' || in_array($name, (array) config('brewless.ops.never_ending'), true)) {
             return ['exit_code' => 1, 'output' => '', 'seconds' => 0.0, 'refused' => true];
+        }
+
+        if (in_array($name, (array) config('brewless.ops.destructive'), true)) {
+            return ['exit_code' => 1, 'output' => 'Command "'.$name.'" throws data away and does not run over HTTP. Run it at the console, on purpose.', 'seconds' => 0.0, 'refused' => true];
         }
 
         if (! array_key_exists($name, Artisan::all())) {
@@ -161,5 +178,23 @@ final class Runtime
             'seconds' => round(microtime(true) - $started, 2),
             'refused' => false,
         ];
+    }
+
+    /**
+     * Is there a job to run now? Only the database queue can be asked this
+     * cheaply; with any other queue the worker is started and finds out.
+     */
+    private function hasWork(): bool
+    {
+        $connection = 'queue.connections.'.config('queue.default');
+
+        if (config($connection.'.driver') !== 'database') {
+            return true;
+        }
+
+        return DB::connection(config($connection.'.connection'))
+            ->table((string) config($connection.'.table', 'jobs'))
+            ->where('available_at', '<=', now()->getTimestamp())
+            ->exists();
     }
 }

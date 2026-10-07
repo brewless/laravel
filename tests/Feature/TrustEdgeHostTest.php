@@ -28,3 +28,29 @@ test('an application without an edge secret believes no header', function (): vo
 
     $this->get('/host', ['X-Brewless-Edge' => '', 'Cdn-Host' => 'www.shop.example'])->assertSee('localhost|');
 });
+
+test('through the edge the visitor address is what the edge appended, whatever the visitor put in front', function (): void {
+    $edge = ['X-Brewless-Edge' => TestCase::EDGE_SECRET];
+
+    $this->get('/address', $edge + ['X-Forwarded-For' => '203.0.113.7'])->assertSee('forwarded:203.0.113.7');
+    $this->get('/address', $edge + ['X-Forwarded-For' => '198.51.100.1, 203.0.113.7'])->assertSee('forwarded:203.0.113.7');
+
+    config(['brewless.edge.hops' => 2]);
+
+    $this->get('/address', $edge + ['X-Forwarded-For' => '198.51.100.1, 203.0.113.7, 192.0.2.10'])->assertSee('forwarded:203.0.113.7');
+    $this->get('/address', $edge + ['X-Forwarded-For' => '203.0.113.7'])->assertSee('forwarded:nothing');
+});
+
+test('without the edge secret the forwarded address is dropped, so nobody picks their own', function (array $headers): void {
+    $this->get('/address', $headers)->assertSee('forwarded:nothing');
+})->with([
+    'no secret' => [['X-Forwarded-For' => '203.0.113.7']],
+    'wrong secret' => [['X-Brewless-Edge' => 'guess', 'X-Forwarded-For' => '203.0.113.7']],
+    'not an address' => [['X-Brewless-Edge' => TestCase::EDGE_SECRET, 'X-Forwarded-For' => 'unknown']],
+]);
+
+test('an application without an edge keeps the forwarded address it was given', function (): void {
+    config(['brewless.edge.secret' => null]);
+
+    $this->get('/address', ['X-Forwarded-For' => '203.0.113.7'])->assertSee('forwarded:203.0.113.7');
+});
