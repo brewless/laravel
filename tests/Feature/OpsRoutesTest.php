@@ -8,6 +8,7 @@ use Brewless\Laravel\Tests\TestCase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 uses(TestCase::class);
@@ -136,6 +137,15 @@ test('an address that keeps guessing the secret is shut out, with the same 404',
 
     $this->travel(61)->seconds();
     $this->withServerVariables([])->getJson('/_ops/status', $this->ops())->assertOk();
+});
+
+test('on a database without tables yet, the right secret still runs the release commands that make them', function (): void {
+    // The cache lives in the database, and its table is one of those the release makes.
+    config(['cache.default' => 'database']);
+    Schema::dropIfExists('cache');
+
+    $this->getJson('/_ops/status', ['X-Brewless-Ops' => 'wrong'])->assertNotFound();
+    $this->postJson('/_ops/migrate', [], $this->ops())->assertOk()->assertJsonPath('ok', true);
 });
 
 test('a command that throws data away does not run over http', function (): void {
