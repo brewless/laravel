@@ -8,6 +8,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * What Brewless asks of an application's own containers: run the release
@@ -41,6 +42,41 @@ final class Runtime
     }
 
     /**
+     * Run the release commands of the project's brewless.yml, in order. One
+     * that never ends or throws data away is refused before any runs; one
+     * that fails stops the release. The answer names each command with what
+     * it printed under `commands`, which is how Brewless knows these ran and
+     * not the application's own.
+     *
+     * @param  list<string>  $commands
+     * @return array{commands: array<string, string>, seconds: float}
+     */
+    public function releaseCommands(array $commands): array
+    {
+        foreach ($commands as $command) {
+            $name = strtok(trim($command), ' ') ?: '';
+
+            if (in_array($name, (array) config('brewless.ops.never_ending'), true) || in_array($name, (array) config('brewless.ops.destructive'), true)) {
+                throw new RuntimeException('Release command "'.$name.'" is refused: it never ends or throws data away.');
+            }
+        }
+
+        $started = microtime(true);
+        $printed = [];
+
+        foreach ($commands as $command) {
+            $exitCode = Artisan::call(trim($command).' --no-interaction');
+            $printed[trim($command)] = Str::limit(Artisan::output(), self::OUTPUT_LIMIT);
+
+            if ($exitCode !== 0) {
+                throw new RuntimeException('Release command "'.trim($command).'" ended with exit code '.$exitCode.'.');
+            }
+        }
+
+        return ['commands' => $printed, 'seconds' => round(microtime(true) - $started, 2)];
+    }
+
+    /**
      * One tick of the scheduler: what `schedule:run` does every minute on a server.
      *
      * @return array{output: string, seconds: float}
@@ -56,11 +92,13 @@ final class Runtime
     }
 
     /**
-     * Work the queue until it is empty or the time is up.
+     * Work the queue until it is empty or the time is up: the named queues,
+     * the first first, or the application's default.
      *
+     * @param  list<string>|null  $queues
      * @return array{output: string, seconds: float}
      */
-    public function queue(): array
+    public function queue(?array $queues = null): array
     {
         $started = microtime(true);
 
@@ -69,7 +107,7 @@ final class Runtime
 
         // Nothing due: do not start a worker. Starting one costs a dozen
         // queries on the cache and jobs tables just to find the queue empty.
-        if (! $this->hasWork()) {
+        if (! $this->hasWork($queues)) {
             return ['output' => '', 'seconds' => round(microtime(true) - $started, 2)];
         }
 
@@ -82,6 +120,7 @@ final class Runtime
             // daemon that never restarts; this one ends with the request anyway.
             '--memory' => self::MEMORY_MB,
             '--no-interaction' => true,
+            ...($queues === null ? [] : ['--queue' => implode(',', $queues)]),
         ]);
 
         return ['output' => Artisan::output(), 'seconds' => round(microtime(true) - $started, 2)];
@@ -184,7 +223,10 @@ final class Runtime
      * Is there a job to run now? Only the database queue can be asked this
      * cheaply; with any other queue the worker is started and finds out.
      */
-    private function hasWork(): bool
+    /**
+     * @param  list<string>|null  $queues
+     */
+    private function hasWork(?array $queues = null): bool
     {
         $connection = 'queue.connections.'.config('queue.default');
 
@@ -195,6 +237,7 @@ final class Runtime
         return DB::connection(config($connection.'.connection'))
             ->table((string) config($connection.'.table', 'jobs'))
             ->where('available_at', '<=', now()->getTimestamp())
+            ->when($queues !== null, fn ($query) => $query->whereIn('queue', $queues))
             ->exists();
     }
 }

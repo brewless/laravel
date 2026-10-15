@@ -21,8 +21,8 @@ routes of their own:
 
 | Route | What it does |
 | --- | --- |
-| `POST /_ops/migrate` | Runs the release commands (`migrate --force`) before a release goes live |
-| `POST /` with `{"task": "tick"}` | One scheduler tick, then the queue; the body a cron trigger sends |
+| `POST /_ops/migrate` | Runs the release commands (`migrate --force`) before a release goes live; with `{"commands": [...]}` those instead |
+| `POST /` with `{"task": "tick"}` | One scheduler tick, then the queue; the body a cron trigger sends. `{"task": "queue"}` only works the queue, and `"queues": ["mail", "default"]` names the queues to work, the first first |
 | `POST /_ops/schedule`, `POST /_ops/queue` | The same two, separately |
 | `GET /_ops/status` | Last tick, jobs waiting, jobs failed (which, never why) |
 | `POST /_ops/queue/retry` | Puts every failed job back on the queue |
@@ -36,7 +36,10 @@ this work; the container that serves visitors does not need it.
 
 Commands that never return (`queue:work`, `tinker`, `serve`, …) and commands
 that throw data away (`migrate:fresh`, `db:wipe`, …) are refused on
-`/_ops/command`. An address that gives a wrong secret ten times in a minute
+`/_ops/command`, and as release commands sent along with a release.
+Brewless sends the release commands and queues of your project's
+`brewless.yml`; without them the commands of `ops.release_commands` and the
+default queue are used. An address that gives a wrong secret ten times in a minute
 gets the same 404 for a minute, whatever it sends. A tick that finds no job
 due does not start a worker, so an idle application costs a single query.
 

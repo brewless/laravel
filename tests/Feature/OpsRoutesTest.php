@@ -187,3 +187,50 @@ test('an application names only the settings it changes', function (): void {
         ->and(config('brewless.ops.never_ending'))->toContain('tinker')
         ->and(config('brewless.edge.host_header'))->toBe('Cdn-Host');
 });
+
+test('release commands sent along run instead of the application\'s own, and are named in the answer', function (): void {
+    config(['brewless.ops.release_commands' => ['this:does-not-exist']]);
+
+    $this->postJson('/_ops/migrate', ['commands' => ['migrate --force', 'about']], $this->ops())
+        ->assertOk()
+        ->assertJsonPath('ok', true)
+        ->assertJsonStructure(['commands' => ['migrate --force', 'about'], 'seconds']);
+});
+
+test('a release command sent along that fails, never ends or throws data away stops the release', function (array $commands): void {
+    $this->postJson('/_ops/migrate', ['commands' => $commands], $this->ops())
+        ->assertStatus(500)
+        ->assertJsonPath('ok', false);
+})->with([
+    'unknown' => [['this:does-not-exist']],
+    'never ends' => [['migrate --force', 'queue:work']],
+    'throws data away' => [['migrate:fresh']],
+]);
+
+test('release commands that are not a list of single lines are refused', function (mixed $commands): void {
+    $this->postJson('/_ops/migrate', ['commands' => $commands], $this->ops())->assertUnprocessable();
+})->with([
+    'not a list' => ['migrate --force'],
+    'empty' => [[]],
+    'two lines' => [["migrate --force\nabout"]],
+]);
+
+test('a tick works only the queues it names, the first first', function (): void {
+    dispatch(function (): void {
+        Cache::put('ran-on-other', true);
+    })->onQueue('other');
+
+    // Only a job on another queue is due: no worker starts, and it stays.
+    $this->postJson('/', ['secret' => TestCase::OPS_SECRET, 'task' => 'queue', 'queues' => ['mail', 'default']])
+        ->assertOk()
+        ->assertJsonPath('output', '');
+
+    expect(Cache::get('ran-on-other'))->toBeNull();
+
+    $this->postJson('/', ['secret' => TestCase::OPS_SECRET, 'task' => 'tick', 'queues' => ['mail', 'other']])->assertOk();
+
+    expect(Cache::get('ran-on-other'))->toBeTrue();
+
+    $this->postJson('/', ['secret' => TestCase::OPS_SECRET, 'task' => 'tick', 'queues' => 'mail'])->assertUnprocessable();
+    $this->postJson('/', ['secret' => TestCase::OPS_SECRET, 'task' => 'queue', 'queues' => ['bad name']])->assertUnprocessable();
+});

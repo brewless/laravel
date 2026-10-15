@@ -3,6 +3,11 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.3.0 (2026-10-16)
+
+- `POST /_ops/migrate` runs the release commands sent along as `commands`, in order, instead of `ops.release_commands`, and names each of them in its answer under `commands`. Brewless sends the `release` commands of a project's `brewless.yml` this way. Commands that never end or throw data away are refused before any runs.
+- The trigger and `POST /_ops/queue` take `queues`: the queues to work, the first first. A tick that finds no job due on them does not start a worker.
+
 ## 0.2.1 (2026-10-15)
 
 - The ops routes work when the application's cache cannot be reached, such as a database cache whose table the release commands have yet to make. The secret alone decides then; guesses are counted again once the cache answers.
