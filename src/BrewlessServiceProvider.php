@@ -7,7 +7,10 @@ namespace Brewless\Laravel;
 use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
 use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
+use Brewless\Laravel\Queue\SignedDatabaseConnector;
+use Brewless\Laravel\Queue\SignedSqsConnector;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Queue\QueueManager;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -40,6 +43,13 @@ final class BrewlessServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->publishes([__DIR__.'/../config/brewless.php' => config_path('brewless.php')], 'brewless-config');
+
+        // Every job this application queues is signed with the ops secret, so a
+        // queue trigger of the provider can run it without a secret of its own.
+        $this->app->afterResolving('queue', function (QueueManager $queues): void {
+            $queues->extend('sqs', static fn (): SignedSqsConnector => new SignedSqsConnector);
+            $queues->extend('database', fn (): SignedDatabaseConnector => new SignedDatabaseConnector($this->app['db']));
+        });
 
         // First of all middleware: the host decides a lot further down, so it is put back before anything reads it.
         $this->app->make(Kernel::class)->prependMiddleware(TrustEdgeHost::class);

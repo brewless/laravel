@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 namespace Brewless\Laravel\Ops;
 
+use Brewless\Laravel\Queue\JobSignature;
+use Brewless\Laravel\Queue\TriggeredJob;
+use DateTimeZone;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Console\Kernel as ConsoleKernel;
+use Illuminate\Queue\WorkerOptions;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 /**
  * What Brewless asks of an application's own containers: run the release
@@ -127,6 +135,71 @@ final class Runtime
     }
 
     /**
+     * Run one job a queue trigger of the provider delivered, the way a queue
+     * worker would: its tries, its backoff, its `failed()` and the failed
+     * jobs table all apply. A job that is tried again goes back on its queue
+     * as a new message; the provider takes this one off once we answer.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array{job: string, state: string, seconds: float}
+     */
+    public function job(string $raw, array $payload): array
+    {
+        $started = microtime(true);
+        $connection = (string) config('queue.default');
+        $queue = $payload[JobSignature::QUEUE] ?? null;
+        $job = new TriggeredJob(Container::getInstance(), $raw, $payload, $connection, is_string($queue) ? $queue : null);
+
+        try {
+            app('queue.worker')->process($connection, $job, new WorkerOptions(
+                backoff: 0,
+                memory: self::MEMORY_MB,
+                maxTries: (int) config('brewless.ops.queue_tries'),
+            ));
+        } catch (Throwable $exception) {
+            // The worker released or failed the job already, and rethrows as a
+            // daemon would for its log. Reported the same way here; a job that
+            // failed for good is kept where `queue:work` keeps it.
+            report($exception);
+
+            if ($job->hasFailed()) {
+                app('queue.failer')->log($connection, (string) $job->getQueue(), $raw, $exception);
+            }
+        }
+
+        Heartbeat::beat(Heartbeat::QUEUE);
+
+        return [
+            'job' => $job->resolveName(),
+            'state' => $job->hasFailed() ? 'failed' : ($job->isReleased() ? 'released' : 'done'),
+            'seconds' => round(microtime(true) - $started, 2),
+        ];
+    }
+
+    /**
+     * The moments the application's schedule has work, as cron expressions
+     * with their time zone: so whoever calls the scheduler can call it only
+     * then, instead of every minute.
+     *
+     * @return list<array{expression: string, timezone: string, task: string}>
+     */
+    public function scheduledMoments(): array
+    {
+        // The schedule is defined with the console's routes, which a web request does not load by itself.
+        app(ConsoleKernel::class)->bootstrap();
+
+        $moments = [];
+
+        foreach (app(Schedule::class)->events() as $event) {
+            $timezone = $event->timezone instanceof DateTimeZone ? $event->timezone->getName() : (string) ($event->timezone ?? config('app.timezone'));
+
+            $moments[] = ['expression' => $event->expression, 'timezone' => $timezone, 'task' => $event->getSummaryForDisplay()];
+        }
+
+        return $moments;
+    }
+
+    /**
      * How the schedule and the queue are doing. Which jobs failed, not why:
      * an exception can quote the data it failed on.
      *
@@ -166,6 +239,7 @@ final class Runtime
             'jobs_waiting' => $waiting ?? 0,
             'jobs_failed' => $failedCount ?? 0,
             'failed' => $failed,
+            'schedule' => $this->scheduledMoments(),
             'now' => now()->toIso8601String(),
         ];
     }

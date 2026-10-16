@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Brewless\Laravel\Http\Middleware;
 
+use Brewless\Laravel\Queue\JobSignature;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
@@ -16,7 +18,8 @@ use Throwable;
  * routes cannot be told apart from routes that do not exist.
  *
  * The secret comes in a header (a release) or in the JSON body (a trigger of
- * the provider can only send a body).
+ * the provider can only send a body). A queue trigger of the provider sends
+ * the job itself, signed by this application (JobSignature).
  *
  * An address that keeps guessing is shut out for a minute, with the same
  * 404, so the secret cannot be found by trying. The guesses are counted in
@@ -26,6 +29,9 @@ use Throwable;
  */
 final class EnsureOpsSecret
 {
+    /** Where a signed job from the provider's queue trigger is handed to the route. */
+    public const string SIGNED_JOB = 'brewless.signed_job';
+
     /**
      * @param  Closure(Request): Response  $next
      */
@@ -37,6 +43,26 @@ final class EnsureOpsSecret
 
         $secret = config('brewless.ops.secret');
         $given = $request->headers->get((string) config('brewless.ops.secret_header')) ?? $request->json('secret');
+
+        // A job the provider's queue trigger delivers carries no secret of ours,
+        // only the signature this application put on it. One whose signature
+        // does not hold is answered, not run: refused, the provider would
+        // deliver it again every half minute, without end.
+        if ($given === null && is_string($secret) && $secret !== '' && $request->routeIs('brewless.ops.trigger')) {
+            $payload = json_decode($request->getContent(), true);
+
+            if (is_array($payload) && JobSignature::isJob($payload)) {
+                if (! JobSignature::holds($payload, $secret)) {
+                    Log::warning('brewless: a queue message without a valid signature was dropped', ['uuid' => $payload['uuid']]);
+
+                    return response()->json(['ok' => false, 'dropped' => true]);
+                }
+
+                $request->attributes->set(self::SIGNED_JOB, $payload);
+
+                return $next($request);
+            }
+        }
 
         if (! is_string($secret) || $secret === '' || ! is_string($given) || ! hash_equals($secret, $given)) {
             $this->counted(static fn (): int => RateLimiter::hit($key));

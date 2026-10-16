@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Brewless\Laravel\Http\Controllers;
 
+use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
 use Brewless\Laravel\Ops\Runtime;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -82,6 +83,20 @@ final class OpsController
      */
     public function trigger(Request $request): JsonResponse
     {
+        $job = $request->attributes->get(EnsureOpsSecret::SIGNED_JOB);
+
+        // A job from the provider's queue trigger: whatever happens to it, the
+        // answer says it arrived, or the provider delivers it again and again.
+        if (is_array($job)) {
+            try {
+                return response()->json(['ok' => true] + $this->runtime->job($request->getContent(), $job));
+            } catch (Throwable $exception) {
+                report($exception);
+
+                return response()->json(['ok' => false, 'error' => $exception->getMessage()]);
+            }
+        }
+
         $queues = $this->queues($request);
 
         if ($queues === false) {
