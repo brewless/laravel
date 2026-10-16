@@ -3,6 +3,12 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.4.0 (2026-10-16)
+
+- Every job the `sqs` and `database` connections queue is signed with the ops secret (`brewless_signature`, over its id, handler and data, after the command is serialised), and names the queue it went on.
+- A queue trigger of the provider posts a job to `/` without any secret. A job whose signature holds runs there like a queue worker runs it (tries, backoff, `failed()`, the failed jobs table); one that is tried again goes back on its queue as a new message, counting its attempts. The answer is always a success, also when the job failed or its signature did not hold (then it is dropped and a warning logged): a refused message would be delivered again every half minute, without end.
+- `GET /_ops/status` names the moments of the schedule (`schedule`: the cron expression, time zone and task of every event), so the scheduler can be called only then instead of every minute.
+
 ## 0.3.0 (2026-10-16)
 
 - `POST /_ops/migrate` runs the release commands sent along as `commands`, in order, instead of `ops.release_commands`, and names each of them in its answer under `commands`. Brewless sends the `release` commands of a project's `brewless.yml` this way. Commands that never end or throw data away are refused before any runs.

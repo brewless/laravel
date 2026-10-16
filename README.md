@@ -24,7 +24,8 @@ routes of their own:
 | `POST /_ops/migrate` | Runs the release commands (`migrate --force`) before a release goes live; with `{"commands": [...]}` those instead |
 | `POST /` with `{"task": "tick"}` | One scheduler tick, then the queue; the body a cron trigger sends. `{"task": "queue"}` only works the queue, and `"queues": ["mail", "default"]` names the queues to work, the first first |
 | `POST /_ops/schedule`, `POST /_ops/queue` | The same two, separately |
-| `GET /_ops/status` | Last tick, jobs waiting, jobs failed (which, never why) |
+| `POST /` with a queued job | A job a queue trigger delivers (Scaleway Queues), run once its signature holds; see below |
+| `GET /_ops/status` | Last tick, jobs waiting, jobs failed (which, never why), and the moments of the schedule |
 | `POST /_ops/queue/retry` | Puts every failed job back on the queue |
 | `POST /_ops/command` | Runs one console command, without questions |
 
@@ -33,6 +34,18 @@ Every route needs the secret from `BREWLESS_OPS_SECRET`, in the header
 variable has none of these routes**: they answer 404, the same as a path
 that does not exist. Give the secret only to the containers that should do
 this work; the container that serves visitors does not need it.
+
+### Queue triggers
+
+A queue at Scaleway Queues can call the worker as soon as a job is put on
+it, so nothing has to look at the queue every minute. Such a trigger posts
+the job itself to `/`, without any secret. So every job the `sqs` and
+`database` connections queue is signed with `BREWLESS_OPS_SECRET`, and only
+a job whose signature holds is run: a job is code that gets unserialised.
+It runs the way `queue:work` runs it, with its tries, backoff, `failed()`
+and the failed jobs table. The answer is always a success, also for a job
+that failed or that was dropped: the provider would otherwise deliver it
+again every half minute, without end.
 
 Commands that never return (`queue:work`, `tinker`, `serve`, …) and commands
 that throw data away (`migrate:fresh`, `db:wipe`, …) are refused on
