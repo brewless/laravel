@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.4.1 (2026-10-16)
+
+- The signature of a queued job covers its whole payload, also what other packages add to it, such as the tenant a job of stancl/tenancy runs for. A job signed by 0.4.0 no longer holds: let the queue run empty before updating.
+
 ## 0.4.0 (2026-10-16)
 
 - Every job the `sqs` and `database` connections queue is signed with the ops secret (`brewless_signature`, over its id, handler and data, after the command is serialised), and names the queue it went on.

@@ -6,7 +6,6 @@ namespace Brewless\Laravel\Queue;
 
 use function hash_equals;
 use function hash_hmac;
-use function implode;
 use function is_array;
 use function is_string;
 use function json_encode;
@@ -17,9 +16,10 @@ use function json_encode;
  * root of the container without any secret of ours, and a job is code that
  * gets unserialised: only a message whose signature holds is ever run.
  *
- * The signature covers what decides what runs: the job's identifier, its
- * handler and its data. The attempts are counted next to it and are not
- * covered: changing them only changes when a job is given up.
+ * The signature covers the whole payload: the job's identifier, its
+ * handler, its data and whatever other packages add, such as the tenant it
+ * runs for. The attempts are counted next to it and are not covered:
+ * changing them only changes when a job is given up.
  */
 final class JobSignature
 {
@@ -60,14 +60,17 @@ final class JobSignature
     }
 
     /**
+     * The whole payload as it was signed: everything but the signature, the
+     * attempts counted next to it, and the delay the queue adds after it.
+     * Hooks of other packages add to the payload too (a tenant, for
+     * instance); they are covered as well.
+     *
      * @param  array<array-key, mixed>  $payload
      */
     private static function subject(array $payload): string
     {
-        return implode("\n", [
-            is_string($payload['uuid'] ?? null) ? $payload['uuid'] : '',
-            is_string($payload['job'] ?? null) ? $payload['job'] : '',
-            (string) json_encode($payload['data'] ?? null),
-        ]);
+        unset($payload[self::KEY], $payload[self::ATTEMPTS], $payload['delay']);
+
+        return (string) json_encode($payload);
     }
 }

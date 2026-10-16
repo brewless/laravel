@@ -85,6 +85,11 @@ test('a job whose signature does not hold never runs, and is answered so the pro
 
     deliver((string) json_encode($payload))->assertOk()->assertJsonPath('dropped', true);
 
+    // Whatever else is in the payload is covered too, such as the tenant another package adds.
+    $payload = json_decode(queuedMessage(new RememberThatItRan('hello')), true);
+    $payload['tenant_id'] = 'another-organisation';
+    deliver((string) json_encode($payload))->assertOk()->assertJsonPath('dropped', true);
+
     unset($payload[JobSignature::KEY]);
     deliver((string) json_encode($payload))->assertOk()->assertJsonPath('dropped', true);
 
