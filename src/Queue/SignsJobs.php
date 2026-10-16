@@ -27,6 +27,8 @@ trait SignsJobs
             return $payload;
         }
 
-        return [...$payload, JobSignature::QUEUE => $queue, JobSignature::KEY => JobSignature::sign($payload, $secret)];
+        $payload[JobSignature::QUEUE] = $queue;
+
+        return [...$payload, JobSignature::KEY => JobSignature::sign($payload, $secret)];
     }
 }

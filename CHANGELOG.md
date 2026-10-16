@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.4.2 (2026-10-16)
+
+- 0.4.1 signed a job before naming its queue in it, so no job of 0.4.1 holds. Use 0.4.2.
+
 ## 0.4.1 (2026-10-16)
 
 - The signature of a queued job covers its whole payload, also what other packages add to it, such as the tenant a job of stancl/tenancy runs for. A job signed by 0.4.0 no longer holds: let the queue run empty before updating.
