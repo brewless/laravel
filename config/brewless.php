@@ -71,6 +71,20 @@ return [
     ],
 
     /*
+    | The test address Brewless gives every environment.
+    |
+    | Brewless points `<organisation>-<application>-<environment>` under its
+    | own test domain straight at the web container. An application that only
+    | answers on its own domain would not know that name, so a request for it
+    | is handled as a request for the host of APP_URL, and every answer on it
+    | tells search engines to stay away: `X-Robots-Tag: noindex, nofollow`,
+    | and a robots.txt that disallows everything.
+    */
+    'preview' => [
+        'domains' => array_values(array_filter(explode(',', (string) env('BREWLESS_PREVIEW_DOMAINS', 'brewless.dev')))),
+    ],
+
+    /*
     | A queue at Scaleway Queues.
     |
     | Scaleway's queues speak SQS but take a key of their own, not the key

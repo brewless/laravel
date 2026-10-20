@@ -6,6 +6,7 @@ namespace Brewless\Laravel;
 
 use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
+use Brewless\Laravel\Http\Middleware\PreviewHost;
 use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
 use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
@@ -35,7 +36,7 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $defaults = require __DIR__.'/../config/brewless.php';
 
-        foreach (['ops', 'edge', 'queue'] as $section) {
+        foreach (['ops', 'edge', 'preview', 'queue'] as $section) {
             config(['brewless.'.$section => array_replace($defaults[$section], (array) config('brewless.'.$section))]);
         }
     }
@@ -52,7 +53,10 @@ final class BrewlessServiceProvider extends ServiceProvider
         });
 
         // First of all middleware: the host decides a lot further down, so it is put back before anything reads it.
-        $this->app->make(Kernel::class)->prependMiddleware(TrustEdgeHost::class);
+        // Prepended in reverse: the edge's hostname first, then the test address.
+        $kernel = $this->app->make(Kernel::class);
+        $kernel->prependMiddleware(PreviewHost::class);
+        $kernel->prependMiddleware(TrustEdgeHost::class);
 
         // Machine traffic from a release and from the provider's triggers: no
         // session, no CSRF, no domain. Without the secret they do not exist.

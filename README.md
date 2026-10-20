@@ -72,6 +72,17 @@ and nobody chooses their own address. `BREWLESS_EDGE_HOPS` says how many
 proxies append to the header (default 1). Without an edge secret the header
 is left as it arrived.
 
+### The test address
+
+Brewless gives every environment a test address, such as
+`acme-shop-production.brewless.dev`, that leads straight to the web
+container. A request on it is handled as a request for the host of `APP_URL`,
+so an application that ties its routes to its own domain answers there too.
+Every answer on the test address carries `X-Robots-Tag: noindex, nofollow`,
+and its `robots.txt` disallows everything, whatever the application serves
+there itself. Your own domains are left alone. The request carries the
+attribute `brewless.preview` when it came in on the test address.
+
 ## Settings
 
 | Variable | Meaning |
@@ -80,6 +91,7 @@ is left as it arrived.
 | `BREWLESS_EDGE_SECRET` | The secret the edge adds to every request |
 | `BREWLESS_DOMAINS` | Comma-separated domains that are yours |
 | `BREWLESS_EDGE_HOPS` | Proxies between the visitor and the container (`1`) |
+| `BREWLESS_PREVIEW_DOMAINS` | Comma-separated test domains (`brewless.dev`); empty turns the test address off |
 | `BREWLESS_HEARTBEAT_STORE` | Cache store for the sign of life (`file`) |
 | `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY`, `SQS_ENDPOINT` | The key and address of a queue at Scaleway Queues; handed to the `sqs` connection, which otherwise shares `AWS_*` with the `s3` disk |
 | `RELEASE` | The running image; set by Brewless on each release |
