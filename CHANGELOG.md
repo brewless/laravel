@@ -3,7 +3,7 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
-## 0.5.0 (unreleased)
+## 0.5.0 (2026-10-20)
 
 - A request on the test address Brewless gives an environment (a name under `brewless.dev`, or the domains in `BREWLESS_PREVIEW_DOMAINS`) is handled as a request for the host of `APP_URL`, so an application bound to its own domain answers there. Every answer on it carries `X-Robots-Tag: noindex, nofollow`, and `/robots.txt` there disallows everything.
 
