@@ -78,9 +78,11 @@ Brewless gives every environment a test address, such as
 `acme-shop-production.brewless.dev`, that leads straight to the web
 container. A request on it is handled as a request for the host of `APP_URL`,
 so an application that ties its routes to its own domain answers there too.
-Every answer on the test address carries `X-Robots-Tag: noindex, nofollow`,
-and its `robots.txt` disallows everything, whatever the application serves
-there itself. Your own domains are left alone. The request carries the
+Every answer of the application on the test address carries
+`X-Robots-Tag: noindex, nofollow`, and its `robots.txt` disallows everything.
+A `public/robots.txt` of your own is the exception: the web server hands out
+existing files before the application runs, so that file is served as it is.
+The pages still carry `noindex`, which is what keeps them out of search results. Your own domains are left alone. The request carries the
 attribute `brewless.preview` when it came in on the test address.
 
 ## Settings
