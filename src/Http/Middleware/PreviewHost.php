@@ -7,6 +7,7 @@ namespace Brewless\Laravel\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as PlainResponse;
+use Illuminate\Support\Facades\URL;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -15,8 +16,10 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * The test address is a name under Brewless's test domain that leads
  * straight to the web container. An application that ties its routes to its
- * own domain would answer it with a 404, so the request is handled as one
- * for the host of APP_URL. Every answer carries `X-Robots-Tag: noindex,
+ * own domain would answer it with a 404, so the request is routed as one for
+ * the host of APP_URL, while the URLs the application generates keep the
+ * test address: its pages load their assets from where they came from, as a
+ * strict Content-Security-Policy demands. Every answer carries `X-Robots-Tag: noindex,
  * nofollow`, and robots.txt disallows everything, whatever the application
  * serves there itself.
  *
@@ -46,13 +49,27 @@ final class PreviewHost
 
         $own = parse_url((string) config('app.url'), PHP_URL_HOST);
 
-        if (is_string($own) && $own !== '') {
-            $request->headers->set('Host', $own);
-            $request->server->set('HTTP_HOST', $own);
-            $request->server->set('SERVER_NAME', $own);
+        if (! is_string($own) || $own === '') {
+            return $this->keepOut($next($request));
         }
 
-        return $this->keepOut($next($request));
+        $preview = $request->getScheme().'://'.strtolower(rtrim($request->getHost(), '.'));
+
+        $request->headers->set('Host', $own);
+        $request->server->set('HTTP_HOST', $own);
+        $request->server->set('SERVER_NAME', $own);
+
+        // Routing sees the own domain; the addresses the application writes
+        // into its pages (assets, links, redirects) stay on the test address,
+        // so the browser loads them from the same origin as the page.
+        URL::forceRootUrl($preview);
+
+        try {
+            return $this->keepOut($next($request));
+        } finally {
+            // A process that serves more than one request must not carry it to the next.
+            URL::forceRootUrl(null);
+        }
     }
 
     private function isPreview(string $host): bool

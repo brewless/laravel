@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.5.1 (2026-10-20)
+
+- On the test address the URLs the application generates (assets, links, redirects) keep the test address instead of the host of `APP_URL`, so a page loads its CSS and scripts from its own origin and a strict Content-Security-Policy no longer blocks them.
+
 ## 0.5.0 (2026-10-20)
 
 - A request on the test address Brewless gives an environment (a name under `brewless.dev`, or the domains in `BREWLESS_PREVIEW_DOMAINS`) is handled as a request for the host of `APP_URL`, so an application bound to its own domain answers there. Every answer on it carries `X-Robots-Tag: noindex, nofollow`, and `/robots.txt` there disallows everything.

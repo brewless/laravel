@@ -55,3 +55,14 @@ test('an application without APP_URL keeps the host, and still stays out of sear
 
     $this->get(PREVIEW_URL.'/host')->assertSee('acme-shop-production.brewless.dev|')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
 });
+
+test('the addresses the application writes stay on the test address, so its assets load from the same origin', function (): void {
+    Route::domain('shop.example')->get('/links', fn (): string => url('/build/app.css').'|'.asset('logo.svg'));
+
+    $this->get(PREVIEW_URL.'/links')->assertSee('http://acme-shop-production.brewless.dev/build/app.css|http://acme-shop-production.brewless.dev/logo.svg', false);
+    $this->get('https://acme-shop-production.brewless.dev/links')->assertSee('https://acme-shop-production.brewless.dev/build/app.css', false);
+
+    // The next request, on the own domain, gets its own addresses again.
+    Route::get('/plain-link', fn (): string => url('/x'));
+    $this->get('http://shop.example/plain-link')->assertSee('http://shop.example/x', false);
+});
