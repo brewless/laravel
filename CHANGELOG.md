@@ -3,6 +3,11 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.5.3 (2026-10-21)
+
+- The signature of a queued job covers its content, not the way its JSON was written: the keys of every object are sorted and escaping is written one way before it is signed and checked. A message that Scaleway Queues delivered with the same content written differently no longer gets dropped. A job signed by 0.5.2 or earlier no longer holds; none from Scaleway Queues did.
+- A dropped job is logged with what was different: whether it carried a signature, its keys in order, its size, its content type and whether the provider wrote it again with another encoder. What the job carries is never logged.
+
 ## 0.5.2 (2026-10-21)
 
 - A request with the ops secret may run for `ops.time_limit` seconds (900) instead of PHP's 30 (`max_execution_time` in php.ini-production). Release commands, a queue run and `/_ops/command` were cut off after 30 seconds and answered with a server error. A longer limit, or none, is left as it is; a request without the secret keeps PHP's own.

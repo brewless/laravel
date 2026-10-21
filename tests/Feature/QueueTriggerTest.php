@@ -9,6 +9,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 
@@ -77,6 +78,59 @@ test('a signed job delivered by the queue trigger runs, and the trigger is told 
     expect(Cache::get('ran'))->toBe('hello')
         // Done is done: nothing goes back on the queue.
         ->and(DB::table('jobs')->count())->toBe(0);
+});
+
+/**
+ * Write a message again the way another JSON encoder would: keys in another
+ * order, slashes and non-ASCII characters escaped differently, and with
+ * space between the parts.
+ */
+function reencoded(string $message): string
+{
+    $sorted = function (mixed $value) use (&$sorted): mixed {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (! array_is_list($value)) {
+            krsort($value);
+        }
+
+        return array_map($sorted, $value);
+    };
+
+    return (string) json_encode($sorted(json_decode($message, true)), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+}
+
+test('a job still runs when the provider wrote its message again with another JSON encoder', function (): void {
+    $message = queuedMessage(new RememberThatItRan('héllo/wörld'));
+    $again = reencoded($message);
+
+    expect($again)->not->toBe($message);
+
+    deliver($again)
+        ->assertOk()
+        ->assertJsonPath('ok', true)
+        ->assertJsonPath('state', 'done');
+
+    expect(Cache::get('ran'))->toBe('héllo/wörld');
+});
+
+test('a dropped job says in the log what was different, never what it carries', function (): void {
+    Log::spy();
+
+    $payload = json_decode(queuedMessage(new RememberThatItRan('hello')), true);
+    $payload['data']['command'] = serialize(new RememberThatItRan('changed'));
+    deliver((string) json_encode($payload))->assertJsonPath('dropped', true);
+
+    Log::shouldHaveReceived('warning')->withArgs(function (string $message, array $context) use ($payload): bool {
+        return $message === 'brewless: a queue message without a valid signature was dropped'
+            && $context['uuid'] === $payload['uuid']
+            && $context['signed'] === true
+            && $context['keys'] === array_keys($payload)
+            && is_int($context['bytes'])
+            && ! str_contains((string) json_encode($context), 'changed');
+    })->once();
 });
 
 test('a job whose signature does not hold never runs, and is answered so the provider stops delivering it', function (): void {

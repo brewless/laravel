@@ -57,7 +57,17 @@ final class EnsureOpsSecret
 
             if (is_array($payload) && JobSignature::isJob($payload)) {
                 if (! JobSignature::holds($payload, $secret)) {
-                    Log::warning('brewless: a queue message without a valid signature was dropped', ['uuid' => $payload['uuid']]);
+                    // What was different, never what the job carries: whether it was
+                    // signed at all, which keys it has in which order, its size, and
+                    // whether the provider wrote it again with another encoder.
+                    Log::warning('brewless: a queue message without a valid signature was dropped', [
+                        'uuid' => $payload['uuid'],
+                        'signed' => is_string($payload[JobSignature::KEY] ?? null),
+                        'keys' => array_keys($payload),
+                        'bytes' => strlen($request->getContent()),
+                        'reencoded' => json_encode($payload, JSON_UNESCAPED_UNICODE) !== $request->getContent(),
+                        'content_type' => $request->headers->get('Content-Type'),
+                    ]);
 
                     return response()->json(['ok' => false, 'dropped' => true]);
                 }

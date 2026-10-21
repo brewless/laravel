@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace Brewless\Laravel\Queue;
 
+use function array_is_list;
+use function array_map;
 use function hash_equals;
 use function hash_hmac;
 use function is_array;
 use function is_string;
+use function json_decode;
 use function json_encode;
+use function ksort;
 
 /**
  * A job this application put on its queue carries a signature made with the
@@ -65,12 +69,36 @@ final class JobSignature
      * Hooks of other packages add to the payload too (a tenant, for
      * instance); they are covered as well.
      *
+     * What is signed is the content, not the way it was written: the keys
+     * of every object are sorted and slashes and other characters written
+     * one way. A queue of the provider may write the message again with
+     * another JSON encoder on its way to the container, with the same
+     * content in another order or another escaping.
+     *
      * @param  array<array-key, mixed>  $payload
      */
     private static function subject(array $payload): string
     {
         unset($payload[self::KEY], $payload[self::ATTEMPTS], $payload['delay']);
 
-        return (string) json_encode($payload);
+        $content = json_decode((string) json_encode($payload), true);
+
+        return (string) json_encode(self::sorted($content), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * The same value with the keys of every object in order; a list keeps its order.
+     */
+    private static function sorted(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (! array_is_list($value)) {
+            ksort($value, SORT_STRING);
+        }
+
+        return array_map(self::sorted(...), $value);
     }
 }
