@@ -35,6 +35,11 @@ variable has none of these routes**: they answer 404, the same as a path
 that does not exist. Give the secret only to the containers that should do
 this work; the container that serves visitors does not need it.
 
+PHP ends a web request after 30 seconds by default, shorter than release
+commands or a command may take. A request with the secret gets
+`ops.time_limit` seconds instead (900); the container's own timeout at your
+provider still applies.
+
 ### Queue triggers
 
 A queue at Scaleway Queues can call the worker as soon as a job is put on

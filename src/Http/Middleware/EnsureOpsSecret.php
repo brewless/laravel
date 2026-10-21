@@ -26,6 +26,10 @@ use Throwable;
  * the application's cache; when that cannot be reached, the secret alone
  * decides. The cache of a new application may live in a database whose
  * tables only the release commands behind this door make.
+ *
+ * PHP ends a web request after 30 seconds by default (`max_execution_time`
+ * in php.ini-production), shorter than release commands, a queue run or a
+ * command may take. A request that is let through gets `ops.time_limit`.
  */
 final class EnsureOpsSecret
 {
@@ -59,6 +63,7 @@ final class EnsureOpsSecret
                 }
 
                 $request->attributes->set(self::SIGNED_JOB, $payload);
+                $this->allowTheTime();
 
                 return $next($request);
             }
@@ -70,7 +75,23 @@ final class EnsureOpsSecret
             abort(404);
         }
 
+        $this->allowTheTime();
+
         return $next($request);
+    }
+
+    /**
+     * Raise PHP's limit for this request to `ops.time_limit`. Never lowered:
+     * without a limit (0), or with a longer one, it stays as it is.
+     */
+    private function allowTheTime(): void
+    {
+        $limit = (int) ini_get('max_execution_time');
+        $wanted = (int) config('brewless.ops.time_limit');
+
+        if ($limit > 0 && $wanted > $limit) {
+            set_time_limit($wanted);
+        }
     }
 
     /**

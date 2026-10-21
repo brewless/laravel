@@ -20,6 +20,11 @@ return [
         'secret' => env('BREWLESS_OPS_SECRET'),
         'secret_header' => 'X-Brewless-Ops',
 
+        // How long PHP lets an ops request run, in seconds, instead of the 30 of
+        // php.ini-production: release commands, a queue run and a command
+        // take longer. The container's own timeout at the provider still applies.
+        'time_limit' => 900,
+
         // Wrong secrets an address may give per minute. After that it gets the same 404 for a minute, right or wrong.
         'max_failures' => 10,
 

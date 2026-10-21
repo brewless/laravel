@@ -45,6 +45,26 @@ test('without the secret none of the routes exist', function (string $method, st
     ['POST', '/'],
 ]);
 
+test('a request with the secret may run longer than the 30 seconds php gives a web request, one without it may not', function (): void {
+    $limit = ini_get('max_execution_time');
+
+    try {
+        ini_set('max_execution_time', '30');
+        $this->postJson('/_ops/command', ['command' => 'nothing'])->assertNotFound();
+        expect(ini_get('max_execution_time'))->toBe('30');
+
+        $this->postJson('/_ops/command', ['command' => 'about'], $this->ops())->assertOk();
+        expect(ini_get('max_execution_time'))->toBe('900');
+
+        // A longer limit, or none, is never shortened.
+        ini_set('max_execution_time', '1200');
+        $this->postJson('/_ops/command', ['command' => 'about'], $this->ops())->assertOk();
+        expect(ini_get('max_execution_time'))->toBe('1200');
+    } finally {
+        ini_set('max_execution_time', (string) $limit);
+    }
+});
+
 test('a container that was given no secret has no ops routes at all', function (): void {
     config(['brewless.ops.secret' => null]);
 

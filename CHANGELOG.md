@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.5.2 (2026-10-21)
+
+- A request with the ops secret may run for `ops.time_limit` seconds (900) instead of PHP's 30 (`max_execution_time` in php.ini-production). Release commands, a queue run and `/_ops/command` were cut off after 30 seconds and answered with a server error. A longer limit, or none, is left as it is; a request without the secret keeps PHP's own.
+
 ## 0.5.1 (2026-10-20)
 
 - On the test address the URLs the application generates (assets, links, redirects) keep the test address instead of the host of `APP_URL`, so a page loads its CSS and scripts from its own origin and a strict Content-Security-Policy no longer blocks them.
