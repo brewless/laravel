@@ -49,14 +49,15 @@ final class EnsureOpsSecret
         $given = $request->headers->get((string) config('brewless.ops.secret_header')) ?? $request->json('secret');
 
         // A job the provider's queue trigger delivers carries no secret of ours,
-        // only the signature this application put on it. One whose signature
+        // only the signature this application put on it, with the key
+        // every container derives from the application key. One whose signature
         // does not hold is answered, not run: refused, the provider would
         // deliver it again every half minute, without end.
         if ($given === null && is_string($secret) && $secret !== '' && $request->routeIs('brewless.ops.trigger')) {
             $payload = json_decode($request->getContent(), true);
 
             if (is_array($payload) && JobSignature::isJob($payload)) {
-                if (! JobSignature::holds($payload, $secret)) {
+                if (! JobSignature::holdsForApplication($payload)) {
                     // What was different, never what the job carries: whether it was
                     // signed at all, which keys it has in which order, its size, and
                     // whether the provider wrote it again with another encoder.

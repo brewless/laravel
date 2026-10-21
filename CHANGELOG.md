@@ -3,6 +3,12 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.6.0 (2026-10-21)
+
+- A queued job is signed with a key derived from the application key (`APP_KEY`), no longer with the ops secret. Brewless gives the ops secret only to the containers that do ops work, so every job the container that serves visitors queued (a mail at sign-in, for instance) went out unsigned and the worker dropped it. Every container of an application has the application key.
+- After a rotation of `APP_KEY`, a job signed with one of `app.previous_keys` still runs.
+- A job signed by 0.5.x no longer holds: let the queue run empty before updating, or accept that jobs queued just before the update are dropped.
+
 ## 0.5.3 (2026-10-21)
 
 - The signature of a queued job covers its content, not the way its JSON was written: the keys of every object are sorted and escaping is written one way before it is signed and checked. A message that Scaleway Queues delivered with the same content written differently no longer gets dropped. A job signed by 0.5.2 or earlier no longer holds; none from Scaleway Queues did.

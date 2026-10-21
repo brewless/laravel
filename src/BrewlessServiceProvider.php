@@ -45,8 +45,10 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $this->publishes([__DIR__.'/../config/brewless.php' => config_path('brewless.php')], 'brewless-config');
 
-        // Every job this application queues is signed with the ops secret, so a
-        // queue trigger of the provider can run it without a secret of its own.
+        // Every job this application queues is signed with a key derived from the
+        // application key (JobSignature::key()), so a queue trigger of the provider
+        // can run it without a secret of its own. Every container has that key,
+        // also the one that serves visitors and has no ops secret.
         $this->app->afterResolving('queue', function (QueueManager $queues): void {
             $queues->extend('sqs', static fn (): SignedSqsConnector => new SignedSqsConnector);
             $queues->extend('database', fn (): SignedDatabaseConnector => new SignedDatabaseConnector($this->app['db']));

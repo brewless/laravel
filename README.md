@@ -45,8 +45,13 @@ provider still applies.
 A queue at Scaleway Queues can call the worker as soon as a job is put on
 it, so nothing has to look at the queue every minute. Such a trigger posts
 the job itself to `/`, without any secret. So every job the `sqs` and
-`database` connections queue is signed with `BREWLESS_OPS_SECRET`, and only
-a job whose signature holds is run: a job is code that gets unserialised.
+`database` connections queue is signed, and only a job whose signature holds
+is run: a job is code that gets unserialised. The signing key is derived from
+the application key (`APP_KEY`), not from `BREWLESS_OPS_SECRET`: every
+container of the application queues jobs, also the one that serves visitors
+and has no ops secret, and all of them share the application key. After a
+rotation of `APP_KEY`, a job signed with a key in `APP_PREVIOUS_KEYS` still
+runs.
 It runs the way `queue:work` runs it, with its tries, backoff, `failed()`
 and the failed jobs table. The answer is always a success, also for a job
 that failed or that was dropped: the provider would otherwise deliver it

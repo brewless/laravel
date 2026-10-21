@@ -15,8 +15,8 @@ use function json_encode;
 use function ksort;
 
 /**
- * A job this application put on its queue carries a signature made with the
- * ops secret. A trigger of the provider delivers a queue message to the
+ * A job this application put on its queue carries a signature made with a key
+ * derived from the application key (APP_KEY). A trigger of the provider delivers a queue message to the
  * root of the container without any secret of ours, and a job is code that
  * gets unserialised: only a message whose signature holds is ever run.
  *
@@ -27,6 +27,13 @@ use function ksort;
  */
 final class JobSignature
 {
+    /**
+     * What the application key is mixed with, so the signing key is a key of its
+     * own: knowing a signature or the key tells nothing about the other uses of
+     * the application key, or about the ops secret.
+     */
+    private const string PURPOSE = 'brewless/queue-signature';
+
     public const string KEY = 'brewless_signature';
 
     /** The queue the job was put on, so a job that is tried again goes back to the same one. */
@@ -51,6 +58,49 @@ final class JobSignature
         $given = $payload[self::KEY] ?? null;
 
         return $secret !== '' && is_string($given) && hash_equals(self::sign($payload, $secret), $given);
+    }
+
+    /**
+     * The key every container of the application signs its jobs with.
+     *
+     * Not the ops secret: Brewless gives that only to the containers that do ops
+     * work, and the container that serves visitors queues jobs too (a mail at
+     * sign-in). The application key is the one secret every container of an
+     * application has. Null without one: then no job is signed.
+     */
+    public static function key(): ?string
+    {
+        return self::derive(config('app.key'));
+    }
+
+    /**
+     * Whether the signature of a job holds under the application key, or under
+     * one of its previous keys after a rotation (`app.previous_keys`).
+     *
+     * @param  array<array-key, mixed>  $payload
+     */
+    public static function holdsForApplication(array $payload): bool
+    {
+        $keys = [config('app.key'), ...(array) config('app.previous_keys', [])];
+
+        foreach ($keys as $key) {
+            $derived = self::derive($key);
+
+            if ($derived !== null && self::holds($payload, $derived)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function derive(mixed $applicationKey): ?string
+    {
+        if (! is_string($applicationKey) || $applicationKey === '') {
+            return null;
+        }
+
+        return hash_hmac('sha256', self::PURPOSE, $applicationKey);
     }
 
     /**

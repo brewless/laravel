@@ -30,6 +30,8 @@ abstract class TestCase extends Testbench
      */
     protected function defineEnvironment($app): void
     {
+        // Every application has a key; queued jobs are signed with one derived from it.
+        $app['config']->set('app.key', 'base64:'.base64_encode(str_repeat('k', 32)));
         $app['config']->set('brewless.ops.secret', self::OPS_SECRET);
         $app['config']->set('brewless.ops.heartbeat_store', 'array');
         $app['config']->set('brewless.edge.secret', self::EDGE_SECRET);

@@ -65,7 +65,7 @@ test('every job the application queues is signed, with the queue it went on', fu
     $payload = json_decode(queuedMessage(new RememberThatItRan('hello')), true);
 
     expect($payload[JobSignature::QUEUE])->toBe('mails')
-        ->and(JobSignature::holds($payload, TestCase::OPS_SECRET))->toBeTrue()
+        ->and(JobSignature::holdsForApplication($payload))->toBeTrue()
         ->and(JobSignature::holds($payload, 'another-secret'))->toBeFalse();
 });
 
@@ -166,7 +166,7 @@ test('a failing job goes back on its queue counting its attempt, and after its t
     expect($again->queue)->toBe('mails')
         ->and($payload[JobSignature::ATTEMPTS])->toBe(1)
         // Still signed: the attempts are not part of what is signed.
-        ->and(JobSignature::holds($payload, TestCase::OPS_SECRET))->toBeTrue();
+        ->and(JobSignature::holdsForApplication($payload))->toBeTrue();
 
     DB::table('jobs')->delete();
 
@@ -184,4 +184,46 @@ test('the status names the moments of the schedule, so the scheduler is only cal
 
     expect(collect($moments)->pluck('expression')->all())->toContain('*/15 * * * *', '10 2 * * *')
         ->and(collect($moments)->pluck('timezone')->unique()->all())->toBe(['UTC']);
+});
+
+test('a container without the ops secret, such as the one that serves visitors, signs its jobs too', function (): void {
+    // Brewless gives the ops secret only to the containers that do ops work. The
+    // container that serves visitors queues jobs as well (a mail at sign-in),
+    // and the worker must be able to run them.
+    config(['brewless.ops.secret' => null]);
+    $message = queuedMessage(new RememberThatItRan('from a visitor'));
+    config(['brewless.ops.secret' => TestCase::OPS_SECRET]);
+
+    expect(json_decode($message, true))->toHaveKey(JobSignature::KEY);
+
+    deliver($message)->assertOk()->assertJsonPath('state', 'done');
+
+    expect(Cache::get('ran'))->toBe('from a visitor');
+});
+
+test('a job is not signed with the ops secret, so knowing a job tells nothing about that secret', function (): void {
+    $payload = json_decode(queuedMessage(new RememberThatItRan('hello')), true);
+
+    expect(JobSignature::holds($payload, TestCase::OPS_SECRET))->toBeFalse();
+});
+
+test('a job signed before the application key was rotated still runs while the old key is a previous key', function (): void {
+    $before = (string) config('app.key');
+    $message = queuedMessage(new RememberThatItRan('before the rotation'));
+
+    config(['app.key' => 'base64:'.base64_encode(random_bytes(32)), 'app.previous_keys' => [$before]]);
+
+    deliver($message)->assertOk()->assertJsonPath('state', 'done');
+
+    expect(Cache::get('ran'))->toBe('before the rotation');
+});
+
+test('a job signed under another application key is dropped', function (): void {
+    $message = queuedMessage(new RememberThatItRan('elsewhere'));
+
+    config(['app.key' => 'base64:'.base64_encode(random_bytes(32)), 'app.previous_keys' => []]);
+
+    deliver($message)->assertOk()->assertJsonPath('dropped', true);
+
+    expect(Cache::get('ran'))->toBeNull();
 });
