@@ -3,14 +3,14 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.8.2 (23 October 2026)
+
+- An empty list of release commands (`release: []` in `brewless.yml`) runs nothing and lets the release go on, instead of being refused. For an application without a database there is nothing to run.
+
 ## 0.8.1 (22 October 2026)
 
 - A database name is lowercase letters, digits and dashes (`shop-1`), no longer underscores: Scaleway refuses a Serverless SQL Database whose name has an underscore (`invalid_arguments`, `name:constraint`), so `create('shop_1')` reached Brewless and failed there. The client now refuses an underscore before anything is sent, as Brewless does. A name with an underscore that 0.7.0 accepted is refused; none could be made.
 - A name followed by a line break is refused too.
-
-## 0.8.1 (23 October 2026)
-
-- An empty list of release commands (`release: []` in `brewless.yml`) runs nothing and lets the release go on, instead of being refused. For an application without a database there is nothing to run.
 
 ## 0.8.0 (22 October 2026)
 
