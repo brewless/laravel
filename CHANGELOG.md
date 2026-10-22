@@ -3,7 +3,7 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
-## 0.7.0 (unreleased)
+## 0.7.0 (22 October 2026)
 
 - `Brewless\Laravel\Databases\DatabaseClient` asks Brewless for a database per tenant of the application while it runs: `create()`, `find()` (null when Brewless did not make it), `delete()` (removed at Scaleway at once; one that is gone already is fine), `waitUntilReady()` (looks every two seconds, 120 seconds at most) and `configured()`. It answers with a `DatabaseInfo` (name, status, host, port).
 - It reads `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT` and `BREWLESS_DATABASES_KEY` (`brewless.databases`), which Brewless sets with `databases` in `brewless.yml`. Every request is signed with an HMAC-SHA256 of the method, the path, the time and the hash of the body; the key itself is never sent and never in an exception.
