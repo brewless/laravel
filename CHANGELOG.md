@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.8.0 (22 October 2026)
+
+- With `BREWLESS_REDIS_CA` (the certificate of a Scaleway Managed Database for Redis, base64), the `default` and `cache` redis connections speak TLS and trust that certificate only. Brewless sets it with `cache` in `brewless.yml`. Without it, nothing changes.
+
 ## 0.7.0 (22 October 2026)
 
 - `Brewless\Laravel\Databases\DatabaseClient` asks Brewless for a database per tenant of the application while it runs: `create()`, `find()` (null when Brewless did not make it), `delete()` (removed at Scaleway at once; one that is gone already is fine), `waitUntilReady()` (looks every two seconds, 120 seconds at most) and `configured()`. It answers with a `DatabaseInfo` (name, status, host, port).

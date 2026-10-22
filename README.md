@@ -96,6 +96,10 @@ existing files before the application runs, so that file is served as it is.
 The pages still carry `noindex`, which is what keeps them out of search results. Your own domains are left alone. The request carries the
 attribute `brewless.preview` when it came in on the test address.
 
+### A cache over TLS
+
+A cache at Scaleway (`cache` in `brewless.yml`) is a Managed Database for Redis on the Private Network of your project, reached over TLS with a certificate of its own cluster. Brewless gives the application that certificate as `BREWLESS_REDIS_CA` (base64), next to `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME` and `REDIS_PASSWORD`. With it, the package makes the `default` and `cache` redis connections speak TLS and trust that certificate and no other (`brewless.redis.connections` names them). The host is an address on the Private Network, which no certificate names, so the name is not checked; the certificate is. Without the variable your redis connections are left as you configured them.
+
 ### A database per tenant
 
 An application that gives every customer of its own a database of its own
@@ -164,6 +168,7 @@ error or takes too long.
 | `BREWLESS_EDGE_HOPS` | Proxies between the visitor and the container (`1`) |
 | `BREWLESS_PREVIEW_DOMAINS` | Comma-separated test domains (`brewless.dev`); empty turns the test address off |
 | `BREWLESS_HEARTBEAT_STORE` | Cache store for the sign of life (`file`) |
+| `BREWLESS_REDIS_CA` | The certificate of the cache's cluster, base64; the redis connections then speak TLS and trust only that certificate |
 | `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY`, `SQS_ENDPOINT` | The key and address of a queue at Scaleway Queues; handed to the `sqs` connection, which otherwise shares `AWS_*` with the `s3` disk |
 | `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT`, `BREWLESS_DATABASES_KEY` | Where and as which environment to ask Brewless for a database per tenant, and the key to sign with; set by Brewless with `databases` in `brewless.yml` |
 | `RELEASE` | The running image; set by Brewless on each release |

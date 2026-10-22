@@ -105,6 +105,20 @@ return [
     ],
 
     /*
+    | A cache at Scaleway (`cache` in brewless.yml).
+    |
+    | A Managed Database for Redis is reached over the Private Network, over
+    | TLS, with a certificate of its own cluster that no public authority
+    | signed. Brewless gives the application that certificate (base64) here;
+    | the redis connections then speak TLS and trust that certificate and no
+    | other. Without it they are left as your application configured them.
+    */
+    'redis' => [
+        'ca' => env('BREWLESS_REDIS_CA'),
+        'connections' => ['default', 'cache'],
+    ],
+
+    /*
     | A database per tenant (`databases` in brewless.yml).
     |
     | On a Serverless SQL Database at Scaleway a database cannot be made over

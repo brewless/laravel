@@ -30,6 +30,8 @@ final class BrewlessServiceProvider extends ServiceProvider
             config(['queue.connections.sqs' => array_filter((array) config('brewless.queue'), is_string(...)) + (array) config('queue.connections.sqs', [])]);
         }
 
+        $this->trustRedisCertificate();
+
         // Read when it is asked for, so a test or a command can set the settings first.
         $this->app->bind(DatabaseClient::class, static fn (Application $app): DatabaseClient => new DatabaseClient(
             $app->make(Factory::class),
@@ -39,6 +41,39 @@ final class BrewlessServiceProvider extends ServiceProvider
             (int) config('brewless.databases.timeout', 15),
             (int) config('brewless.databases.connect_timeout', 5),
         ));
+    }
+
+    /**
+     * The redis connections speak TLS to the cache of the environment and
+     * trust only the certificate of its cluster. The host is an address on
+     * the Private Network, which no certificate names, so the name is not
+     * checked; the certificate itself is.
+     */
+    private function trustRedisCertificate(): void
+    {
+        $encoded = self::setting('brewless.redis.ca');
+        $pem = $encoded === null ? false : base64_decode($encoded, true);
+
+        if (! is_string($pem) || ! str_contains($pem, 'BEGIN CERTIFICATE')) {
+            return;
+        }
+
+        // Written once per certificate: a container keeps its files between requests while it runs.
+        $file = sys_get_temp_dir().'/brewless-redis-'.substr(hash('sha256', $pem), 0, 16).'.pem';
+
+        if (! is_file($file)) {
+            file_put_contents($file, $pem, LOCK_EX);
+        }
+
+        foreach ((array) config('brewless.redis.connections') as $connection) {
+            if (! is_string($connection) || ! is_array(config('database.redis.'.$connection))) {
+                continue;
+            }
+
+            config(['database.redis.'.$connection.'.scheme' => 'tls', 'database.redis.'.$connection.'.context' => [
+                'stream' => ['cafile' => $file, 'verify_peer' => true, 'verify_peer_name' => false],
+            ]]);
+        }
     }
 
     private static function setting(string $key): ?string
@@ -56,7 +91,7 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $defaults = require __DIR__.'/../config/brewless.php';
 
-        foreach (['ops', 'edge', 'preview', 'queue', 'databases'] as $section) {
+        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases'] as $section) {
             config(['brewless.'.$section => array_replace($defaults[$section], (array) config('brewless.'.$section))]);
         }
     }
