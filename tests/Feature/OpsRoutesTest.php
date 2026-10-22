@@ -231,9 +231,15 @@ test('release commands that are not a list of single lines are refused', functio
     $this->postJson('/_ops/migrate', ['commands' => $commands], $this->ops())->assertUnprocessable();
 })->with([
     'not a list' => ['migrate --force'],
-    'empty' => [[]],
     'two lines' => [["migrate --force\nabout"]],
 ]);
+
+test('an empty list of release commands runs nothing, and the release goes on', function (): void {
+    $this->postJson('/_ops/migrate', ['commands' => []], $this->ops())
+        ->assertOk()
+        ->assertJsonPath('ok', true)
+        ->assertJsonPath('commands', []);
+});
 
 test('a tick works only the queues it names, the first first', function (): void {
     dispatch(function (): void {

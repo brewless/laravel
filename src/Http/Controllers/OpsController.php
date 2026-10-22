@@ -142,11 +142,12 @@ final class OpsController
     }
 
     /**
-     * A list of at most this many commands, each one line.
+     * A list of at most this many commands, each one line. An empty list is
+     * a choice: an application without a database has nothing to run.
      */
     private function lines(mixed $commands, int $most): bool
     {
-        if (! is_array($commands) || ! array_is_list($commands) || $commands === [] || count($commands) > $most) {
+        if (! is_array($commands) || ! array_is_list($commands) || count($commands) > $most) {
             return false;
         }
 
