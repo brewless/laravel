@@ -1,9 +1,10 @@
 # brewless/laravel
 
 What a Laravel application needs to run on [Brewless](https://brewless.eu).
-It runs in **your** containers, in your own cloud account. It does not call
-Brewless, sends nothing anywhere and keeps working when you stop using
-Brewless.
+It runs in **your** containers, in your own cloud account, and keeps working
+when you stop using Brewless. It calls Brewless only when your application
+asks it for a database per tenant (see below); otherwise it sends nothing
+anywhere.
 
 ```bash
 composer require brewless/laravel
@@ -95,6 +96,64 @@ existing files before the application runs, so that file is served as it is.
 The pages still carry `noindex`, which is what keeps them out of search results. Your own domains are left alone. The request carries the
 attribute `brewless.preview` when it came in on the test address.
 
+### A database per tenant
+
+An application that gives every customer of its own a database of its own
+makes that database while it runs. On a Serverless SQL Database at Scaleway
+`CREATE DATABASE` over SQL is never allowed: each database is a resource of
+its own, with its own host, made through Scaleway's API. With `databases` in
+`brewless.yml` the application asks Brewless instead:
+
+```yaml
+environments:
+  production:
+    database: shop-main
+    databases:
+      prefix: shop_
+```
+
+Brewless then gives every container `BREWLESS_API_URL`,
+`BREWLESS_ENVIRONMENT` and `BREWLESS_DATABASES_KEY`, and the client signs
+each request with that key:
+
+```php
+use Brewless\Laravel\Databases\DatabaseClient;
+
+$databases = resolve(DatabaseClient::class);
+
+$database = $databases->create('shop_'.$tenant->id);      // being made
+$database = $databases->waitUntilReady($database->name);  // looks every 2 s, 120 s at most
+
+config(['database.connections.tenant' => [
+    ...config('database.connections.pgsql'),
+    'host' => $database->host,
+    'port' => $database->port,
+    'database' => $database->name,
+]]);
+
+$databases->find('shop_'.$tenant->id);    // null when Brewless did not make it
+$databases->delete('shop_'.$tenant->id);  // removed at Scaleway now, with everything in it
+```
+
+A new database signs in with the application's own `DB_USERNAME` and
+`DB_PASSWORD`; only the host differs. The name has lowercase letters, digits
+and underscores, at most 63, and starts with the prefix. `configured()` says
+whether the three variables are there.
+
+Every request carries `X-Brewless-Environment`, `X-Brewless-Timestamp` and
+`X-Brewless-Signature`: an HMAC-SHA256 with the key, as it stands in the
+variable, over the method, the path, the time in seconds and the SHA-256 of
+the (empty) body, each on a line of its own. The key itself is never sent,
+and never in an exception. A request has `databases.timeout` seconds (15),
+5 of them to connect.
+
+What can go wrong is a `Brewless\Laravel\Databases\DatabaseException`:
+`RequestRefused` when Brewless says no (a wrong key or a clock more than five
+minutes off, a name it does not make; `->status` is the HTTP status),
+`BrewlessUnreachable` when Brewless or Scaleway cannot be reached or asks to
+slow down (safe to ask again), and `DatabaseNotReady` when waiting ends in an
+error or takes too long.
+
 ## Settings
 
 | Variable | Meaning |
@@ -106,6 +165,7 @@ attribute `brewless.preview` when it came in on the test address.
 | `BREWLESS_PREVIEW_DOMAINS` | Comma-separated test domains (`brewless.dev`); empty turns the test address off |
 | `BREWLESS_HEARTBEAT_STORE` | Cache store for the sign of life (`file`) |
 | `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY`, `SQS_ENDPOINT` | The key and address of a queue at Scaleway Queues; handed to the `sqs` connection, which otherwise shares `AWS_*` with the `s3` disk |
+| `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT`, `BREWLESS_DATABASES_KEY` | Where and as which environment to ask Brewless for a database per tenant, and the key to sign with; set by Brewless with `databases` in `brewless.yml` |
 | `RELEASE` | The running image; set by Brewless on each release |
 
 Other release commands, queue time and tries, or more commands to refuse:
