@@ -40,21 +40,21 @@ function databases(): DatabaseClient
  */
 function answer(string $status, ?string $host = null): array
 {
-    return ['name' => 'shop_one', 'status' => $status, 'host' => $host, 'port' => $host === null ? null : 5432];
+    return ['name' => 'shop-one', 'status' => $status, 'host' => $host, 'port' => $host === null ? null : 5432];
 }
 
 test('every request is signed over its method, path, time and empty body with the key as it stands, and the key itself is never sent', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-10-23 10:00:00 UTC'));
     Http::fake(['acme.brewless.eu/*' => Http::response(answer('creating'), 202)]);
 
-    databases()->create('shop_one');
+    databases()->create('shop-one');
 
     Http::assertSent(static function (Request $request): bool {
         $timestamp = (string) (new DateTimeImmutable('2026-10-23 10:00:00 UTC'))->getTimestamp();
-        $expected = hash_hmac('sha256', "PUT\n/api/runtime/databases/shop_one\n".$timestamp."\n".hash('sha256', ''), DATABASES_KEY);
+        $expected = hash_hmac('sha256', "PUT\n/api/runtime/databases/shop-one\n".$timestamp."\n".hash('sha256', ''), DATABASES_KEY);
 
         return $request->method() === 'PUT'
-            && $request->url() === 'https://acme.brewless.eu/api/runtime/databases/shop_one'
+            && $request->url() === 'https://acme.brewless.eu/api/runtime/databases/shop-one'
             && $request->header('X-Brewless-Environment') === [DATABASES_ENVIRONMENT]
             && $request->header('X-Brewless-Timestamp') === [$timestamp]
             && $request->header('X-Brewless-Signature') === [$expected]
@@ -65,32 +65,32 @@ test('every request is signed over its method, path, time and empty body with th
 });
 
 test('the signature is the one brewless checks, for each method', function (string $method): void {
-    expect(DatabaseClient::signature($method, '/api/runtime/databases/shop_one', '1792749600', '', 'key'))
-        ->toBe(hash_hmac('sha256', $method."\n/api/runtime/databases/shop_one\n1792749600\n".hash('sha256', ''), 'key'));
+    expect(DatabaseClient::signature($method, '/api/runtime/databases/shop-one', '1792749600', '', 'key'))
+        ->toBe(hash_hmac('sha256', $method."\n/api/runtime/databases/shop-one\n1792749600\n".hash('sha256', ''), 'key'));
 })->with(['PUT', 'GET', 'DELETE']);
 
 test('create reads the database brewless answers with', function (): void {
     Http::fake(['*' => Http::response(answer('creating'), 202)]);
 
-    expect(databases()->create('shop_one'))->toEqual(new DatabaseInfo('shop_one', 'creating'));
+    expect(databases()->create('shop-one'))->toEqual(new DatabaseInfo('shop-one', 'creating'));
 });
 
 test('find reads where the database stands, and is null for one brewless did not make', function (): void {
     Http::fake([
-        '*/shop_one' => Http::response(answer('ready', 'db-1.pg.sdb.fr-par.scw.cloud')),
-        '*/shop_two' => Http::response(['message' => 'Not Found'], 404),
+        '*/shop-one' => Http::response(answer('ready', 'db-1.pg.sdb.fr-par.scw.cloud')),
+        '*/shop-two' => Http::response(['message' => 'Not Found'], 404),
     ]);
 
-    expect(databases()->find('shop_one'))->toEqual(new DatabaseInfo('shop_one', 'ready', 'db-1.pg.sdb.fr-par.scw.cloud', 5432))
-        ->and(databases()->find('shop_two'))->toBeNull();
+    expect(databases()->find('shop-one'))->toEqual(new DatabaseInfo('shop-one', 'ready', 'db-1.pg.sdb.fr-par.scw.cloud', 5432))
+        ->and(databases()->find('shop-two'))->toBeNull();
 
     Http::assertSent(static fn (Request $request): bool => $request->method() === 'GET');
 });
 
 test('delete removes it, and one that is gone already is fine', function (int $status): void {
-    Http::fake(['*' => Http::response(['name' => 'shop_one', 'status' => 'deleting'], $status)]);
+    Http::fake(['*' => Http::response(['name' => 'shop-one', 'status' => 'deleting'], $status)]);
 
-    databases()->delete('shop_one');
+    databases()->delete('shop-one');
 
     Http::assertSentCount(1);
     Http::assertSent(static fn (Request $request): bool => $request->method() === 'DELETE');
@@ -104,7 +104,7 @@ test('waiting looks every two seconds until the database is ready', function ():
         ->push(answer('ready'))
         ->push(answer('ready', 'db-1.pg.sdb.fr-par.scw.cloud'));
 
-    $database = databases()->waitUntilReady('shop_one');
+    $database = databases()->waitUntilReady('shop-one');
 
     expect($database->host)->toBe('db-1.pg.sdb.fr-par.scw.cloud')
         ->and($database->isReady())->toBeTrue();
@@ -117,7 +117,7 @@ test('waiting gives up after the time asked for', function (): void {
     Sleep::fake();
     Http::fake(['*' => Http::response(answer('creating'))]);
 
-    expect(static fn () => databases()->waitUntilReady('shop_one', 10))
+    expect(static fn () => databases()->waitUntilReady('shop-one', 10))
         ->toThrow(DatabaseNotReady::class, 'was not ready after 10 seconds');
 
     Http::assertSentCount(6);
@@ -127,7 +127,7 @@ test('waiting stops at once on an error, a removal or a database brewless does n
     Sleep::fake();
     Http::fake(['*' => Http::response($body, $code)]);
 
-    expect(static fn () => databases()->waitUntilReady('shop_one'))->toThrow(DatabaseNotReady::class, $message);
+    expect(static fn () => databases()->waitUntilReady('shop-one'))->toThrow(DatabaseNotReady::class, $message);
 
     Http::assertSentCount(1);
     Sleep::assertNeverSlept();
@@ -141,7 +141,7 @@ test('a refusal says what brewless answered', function (int $status, string $mes
     Http::fake(['*' => Http::response(['message' => $message], $status)]);
 
     try {
-        databases()->create('shop_one');
+        databases()->create('shop-one');
         $this->fail('Expected a refusal.');
     } catch (RequestRefused $refused) {
         expect($refused->status)->toBe($status)
@@ -150,14 +150,14 @@ test('a refusal says what brewless answered', function (int $status, string $mes
     }
 })->with([
     'a wrong signature' => [401, 'This request is not signed by an environment that may ask for databases.'],
-    'a name it does not make' => [422, 'The name of the database has to start with shop_.'],
+    'a name it does not make' => [422, 'The name of the database has to start with shop-.'],
     'a blocked organisation' => [423, 'This organisation is blocked.'],
 ]);
 
 test('brewless out of reach, busy or throttling is unreachable, and safe to ask again', function (Closure $answer): void {
     Http::fake(['*' => $answer]);
 
-    expect(static fn () => databases()->create('shop_one'))->toThrow(BrewlessUnreachable::class);
+    expect(static fn () => databases()->create('shop-one'))->toThrow(BrewlessUnreachable::class);
 })->with([
     'no connection' => [static fn () => throw new ConnectionException('Connection timed out after 5001 milliseconds')],
     'a server error' => [static fn () => Http::response(['message' => 'down'], 503)],
@@ -173,7 +173,7 @@ test('requests have a time limit, and one to connect', function (): void {
         return Http::response(answer('creating'), 202);
     });
 
-    databases()->create('shop_one');
+    databases()->create('shop-one');
 
     expect($options)->toMatchArray(['timeout' => 7, 'connect_timeout' => 3]);
 });
@@ -183,7 +183,7 @@ test('without the three variables the client says so and sends nothing', functio
     Http::fake();
 
     expect(databases()->configured())->toBeFalse()
-        ->and(static fn () => databases()->create('shop_one'))->toThrow(DatabaseException::class, 'not configured');
+        ->and(static fn () => databases()->create('shop-one'))->toThrow(DatabaseException::class, 'not configured');
 
     Http::assertNothingSent();
 })->with(['url', 'environment', 'key']);
@@ -198,7 +198,7 @@ test('a name brewless does not make is refused before anything is sent', functio
     expect(static fn () => databases()->create($name))->toThrow(DatabaseException::class, 'is not a database name');
 
     Http::assertNothingSent();
-})->with(['Shop_One', 'shop-one', '../shop_one', '', 'shop_'.str_repeat('a', 59)]);
+})->with(['Shop-One', 'shop_one', '../shop-one', '', "shop-one\n", 'shop-'.str_repeat('a', 59)]);
 
 test('the variables reach the client through the configuration', function (): void {
     $config = require __DIR__.'/../../config/brewless.php';
@@ -208,6 +208,6 @@ test('the variables reach the client through the configuration', function (): vo
 
 test('the signature of a fixed request is the one brewless computes for it', function (): void {
     // The same vector is in Brewless's own tests (RuntimeDatabasesTest), so the two cannot drift apart.
-    expect(DatabaseClient::signature('PUT', '/api/runtime/databases/shop_one', '1792749600', '', DATABASES_KEY))
-        ->toBe('95108defc830ed568d108d9e5a5ba4f1b38b2d22b00d22f6be78b7c172981328');
+    expect(DatabaseClient::signature('PUT', '/api/runtime/databases/shop-one', '1792749600', '', DATABASES_KEY))
+        ->toBe('ed795b610e83a0d86233eee65a3a7203218dcb36ab0d4c4d1f681070d99418f8');
 });

@@ -113,7 +113,7 @@ environments:
   production:
     database: shop-main
     databases:
-      prefix: shop_
+      prefix: shop-
 ```
 
 Brewless then gives every container `BREWLESS_API_URL`,
@@ -125,7 +125,7 @@ use Brewless\Laravel\Databases\DatabaseClient;
 
 $databases = resolve(DatabaseClient::class);
 
-$database = $databases->create('shop_'.$tenant->id);      // being made
+$database = $databases->create('shop-'.$tenant->id);      // being made
 $database = $databases->waitUntilReady($database->name);  // looks every 2 s, 120 s at most
 
 config(['database.connections.tenant' => [
@@ -135,14 +135,16 @@ config(['database.connections.tenant' => [
     'database' => $database->name,
 ]]);
 
-$databases->find('shop_'.$tenant->id);    // null when Brewless did not make it
-$databases->delete('shop_'.$tenant->id);  // removed at Scaleway now, with everything in it
+$databases->find('shop-'.$tenant->id);    // null when Brewless did not make it
+$databases->delete('shop-'.$tenant->id);  // removed at Scaleway now, with everything in it
 ```
 
 A new database signs in with the application's own `DB_USERNAME` and
 `DB_PASSWORD`; only the host differs. The name has lowercase letters, digits
-and underscores, at most 63, and starts with the prefix. `configured()` says
-whether the three variables are there.
+and dashes, at most 63, and starts with the prefix: a Serverless SQL Database
+takes no underscore in its name, and the database inside has the same name.
+Quote it in SQL (`"shop-1"`), since PostgreSQL reads a bare dash as a minus.
+`configured()` says whether the three variables are there.
 
 Every request carries `X-Brewless-Environment`, `X-Brewless-Timestamp` and
 `X-Brewless-Signature`: an HMAC-SHA256 with the key, as it stands in the
