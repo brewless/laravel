@@ -24,8 +24,13 @@ use SensitiveParameter;
  */
 final readonly class DatabaseClient
 {
-    /** What Brewless makes: what PostgreSQL takes unquoted. */
-    private const string NAME = '/^[a-z0-9_]{1,63}$/';
+    /**
+     * What Brewless makes: what a Serverless SQL Database at Scaleway takes as
+     * a name (letters, digits and dashes; the database inside has the same
+     * name), in lowercase, at most 63. An underscore is refused there, so it
+     * is refused here before anything is sent.
+     */
+    private const string NAME = '/^[a-z0-9-]{1,63}$/D';
 
     /** How long to wait between two looks at a database that is being made, in seconds. */
     public const int POLL_SECONDS = 2;

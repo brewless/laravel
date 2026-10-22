@@ -20,6 +20,6 @@ class DatabaseException extends RuntimeException
 
     public static function invalidName(string $name): self
     {
-        return new self('"'.$name.'" is not a database name Brewless makes: use lowercase letters, digits and underscores, at most 63.');
+        return new self('"'.$name.'" is not a database name Brewless makes: use lowercase letters, digits and dashes, at most 63.');
     }
 }

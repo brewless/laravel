@@ -3,6 +3,11 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## Unreleased
+
+- A database name is lowercase letters, digits and dashes (`shop-1`), no longer underscores: Scaleway refuses a Serverless SQL Database whose name has an underscore (`invalid_arguments`, `name:constraint`), so `create('shop_1')` reached Brewless and failed there. The client now refuses an underscore before anything is sent, as Brewless does. A name with an underscore that 0.7.0 accepted is refused; none could be made.
+- A name followed by a line break is refused too.
+
 ## 0.7.0 (22 October 2026)
 
 - `Brewless\Laravel\Databases\DatabaseClient` asks Brewless for a database per tenant of the application while it runs: `create()`, `find()` (null when Brewless did not make it), `delete()` (removed at Scaleway at once; one that is gone already is fine), `waitUntilReady()` (looks every two seconds, 120 seconds at most) and `configured()`. It answers with a `DatabaseInfo` (name, status, host, port).
