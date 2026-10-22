@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Brewless\Laravel;
 
+use Brewless\Laravel\Databases\DatabaseClient;
 use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
 use Brewless\Laravel\Http\Middleware\PreviewHost;
 use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
 use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -26,6 +29,23 @@ final class BrewlessServiceProvider extends ServiceProvider
         if (is_string(config('brewless.queue.key')) && config('brewless.queue.key') !== '') {
             config(['queue.connections.sqs' => array_filter((array) config('brewless.queue'), is_string(...)) + (array) config('queue.connections.sqs', [])]);
         }
+
+        // Read when it is asked for, so a test or a command can set the settings first.
+        $this->app->bind(DatabaseClient::class, static fn (Application $app): DatabaseClient => new DatabaseClient(
+            $app->make(Factory::class),
+            self::setting('brewless.databases.url'),
+            self::setting('brewless.databases.environment'),
+            self::setting('brewless.databases.key'),
+            (int) config('brewless.databases.timeout', 15),
+            (int) config('brewless.databases.connect_timeout', 5),
+        ));
+    }
+
+    private static function setting(string $key): ?string
+    {
+        $value = config($key);
+
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     /**
@@ -36,7 +56,7 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $defaults = require __DIR__.'/../config/brewless.php';
 
-        foreach (['ops', 'edge', 'preview', 'queue'] as $section) {
+        foreach (['ops', 'edge', 'preview', 'queue', 'databases'] as $section) {
             config(['brewless.'.$section => array_replace($defaults[$section], (array) config('brewless.'.$section))]);
         }
     }

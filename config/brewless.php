@@ -103,4 +103,24 @@ return [
         'secret' => env('SQS_SECRET_ACCESS_KEY'),
         'endpoint' => env('SQS_ENDPOINT'),
     ],
+
+    /*
+    | A database per tenant (`databases` in brewless.yml).
+    |
+    | On a Serverless SQL Database at Scaleway a database cannot be made over
+    | SQL: each is a resource of its own, made through Scaleway's API. The
+    | application asks Brewless for one instead, with the client
+    | Brewless\Laravel\Databases\DatabaseClient. Brewless gives every
+    | container these three; every request is signed with the key, which is
+    | never sent itself.
+    */
+    'databases' => [
+        'url' => env('BREWLESS_API_URL'),
+        'environment' => env('BREWLESS_ENVIRONMENT'),
+        'key' => env('BREWLESS_DATABASES_KEY'),
+
+        // Seconds a request to Brewless may take, and may take to connect.
+        'timeout' => 15,
+        'connect_timeout' => 5,
+    ],
 ];
