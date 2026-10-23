@@ -3,7 +3,7 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
-## 0.9.0 (unreleased)
+## 0.9.0 (23 October 2026)
 
 - Guidelines and skills for coding agents, in `resources/boost`. Laravel Boost finds them by itself (`boost:install`, `boost:update`).
   - A guideline loaded in every session: what Brewless is, and the rules an agent keeps on it.
