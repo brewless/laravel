@@ -3,6 +3,13 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.9.0 (unreleased)
+
+- Guidelines and skills for coding agents, in `resources/boost`. Laravel Boost finds them by itself (`boost:install`, `boost:update`).
+  - A guideline loaded in every session: what Brewless is, and the rules an agent keeps on it.
+  - Four skills: `brewless-deployment`, `brewless-configuration`, `brewless-operations` and `brewless-databases`.
+- Without Boost, `vendor:publish --tag=brewless-skills` puts the skills in `.agents/skills`, and `--tag=brewless-skills-claude` in `.claude/skills`.
+
 ## 0.8.2 (23 October 2026)
 
 - An empty list of release commands (`release: []` in `brewless.yml`) runs nothing and lets the release go on, instead of being refused. For an application without a database there is nothing to run.
