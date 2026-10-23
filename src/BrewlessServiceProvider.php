@@ -100,6 +100,12 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $this->publishes([__DIR__.'/../config/brewless.php' => config_path('brewless.php')], 'brewless-config');
 
+        // The agent skills of resources/boost/skills, for a project without Laravel Boost (which finds them
+        // by itself): .agents/skills is read by Codex, Amp, OpenCode, Zed and others, .claude/skills by Claude Code.
+        $skills = __DIR__.'/../resources/boost/skills';
+        $this->publishes([$skills => base_path('.agents/skills')], 'brewless-skills');
+        $this->publishes([$skills => base_path('.claude/skills')], 'brewless-skills-claude');
+
         // Every job this application queues is signed with a key derived from the
         // application key (JobSignature::key()), so a queue trigger of the provider
         // can run it without a secret of its own. Every container has that key,

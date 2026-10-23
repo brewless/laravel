@@ -160,6 +160,41 @@ minutes off, a name it does not make; `->status` is the HTTP status),
 slow down (safe to ask again), and `DatabaseNotReady` when waiting ends in an
 error or takes too long.
 
+## For coding agents
+
+The package teaches a coding agent (Claude Code, Codex, Cursor, Copilot, Junie and others) how an application on Brewless is deployed and run.
+
+With [Laravel Boost](https://laravel.com/docs/boost) there is nothing to do. Run `php artisan boost:install`, or `php artisan boost:update` after updating, and pick `brewless/laravel` among the third-party packages. Boost then writes the files below where each of your agents reads them:
+
+| What | Where it comes from | What it does |
+| --- | --- | --- |
+| Guideline | `resources/boost/guidelines/core.md` | Loaded in every session: what Brewless is, and the rules an agent never breaks on it |
+| `brewless-deployment` | `resources/boost/skills/` | Deploys, plans, releases, rollbacks, pipelines, and why a release failed |
+| `brewless-configuration` | `resources/boost/skills/` | Variables and secrets, `brewless.yml`, container sizes, PHP version, `docker/` server files |
+| `brewless-operations` | `resources/boost/skills/` | Logs, running a command, queues and the schedule, scaling, domains and DNS |
+| `brewless-databases` | `resources/boost/skills/` | Databases, migrations, queues, buckets, backups, the cache, and a database per tenant |
+
+The guideline goes into your `AGENTS.md` or `CLAUDE.md`. The skills go into `.agents/skills`, `.claude/skills`, `.cursor/skills` and so on, one folder per agent. A skill is loaded only when the task calls for it.
+
+The rules of the guideline:
+- Ask before anything that changes an environment: a deploy, a rollback, `env:push`, scaling, DNS, or a command on production.
+- Never pass `--force` on the user's behalf.
+- Never put a secret in `brewless.yml` or the repository.
+- Do not rely on the local disk.
+- No FrankenPHP worker mode or Octane.
+- Leave `/_ops/*` and `POST /` to the package.
+
+Reading (`plan`, `releases`, `logs`, `env:pull`) an agent may do by itself.
+
+Without Boost, publish the skills to where your agent looks for them:
+
+```bash
+php artisan vendor:publish --tag=brewless-skills          # .agents/skills (Codex, Amp, OpenCode, Zed, ...)
+php artisan vendor:publish --tag=brewless-skills-claude   # .claude/skills (Claude Code)
+```
+
+The skills follow the [Agent Skills](https://agentskills.io) format: a folder per skill with a `SKILL.md`.
+
 ## Settings
 
 | Variable | Meaning |
