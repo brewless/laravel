@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.12.0 (24 October 2026)
+
+- A query whose database connection went away is tried again for up to `BREWLESS_DB_RETRY_SECONDS` (60), with pauses of 1, 2, 4 and then 8 seconds, instead of once at once. A managed database that restarts for maintenance (Scaleway's Serverless SQL Database: at most a minute, by default on Tuesdays 14:30–14:45 CEST) no longer fails the requests and jobs of that minute. Never inside a transaction. PostgreSQL's own "terminating connection due to administrator command" and "the database system is starting up" count as a lost connection too. Applies to the `pgsql` and `mysql` drivers, unless the application set a connection class of its own.
+
 ## 0.11.0 (24 October 2026)
 
 - The right ops secret, and a queued job whose signature holds, always pass. Before, an address that gave a wrong secret ten times in a minute got a 404 for a minute whatever it sent, so anyone guessing from the same address as Brewless (the provider's front end, or the container's public `*.scw.cloud` address) could shut Brewless out of its release commands, the scheduler tick and the queue trigger. A wrong secret is still counted per address and answered with the same 404, and the address that reaches `ops.max_failures` is logged once (`brewless: an address keeps giving a wrong ops secret`).

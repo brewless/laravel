@@ -145,4 +145,14 @@ return [
         'timeout' => 15,
         'connect_timeout' => 5,
     ],
+
+    /*
+    | The application's own database. A query whose connection went away, as
+    | when the provider restarts the database for maintenance, is tried again
+    | for up to this many seconds instead of once (never inside a
+    | transaction). 0 keeps Laravel's own single try.
+    */
+    'database' => [
+        'retry_seconds' => (int) env('BREWLESS_DB_RETRY_SECONDS', 60),
+    ],
 ];

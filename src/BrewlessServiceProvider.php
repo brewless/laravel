@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Brewless\Laravel;
 
+use Brewless\Laravel\Database\MySqlConnection;
+use Brewless\Laravel\Database\PostgresConnection;
 use Brewless\Laravel\Databases\DatabaseClient;
 use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
@@ -13,6 +15,7 @@ use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Database\Connection;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Queue\QueueManager;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +34,7 @@ final class BrewlessServiceProvider extends ServiceProvider
         }
 
         $this->trustRedisCertificate();
+        $this->retryLostConnections();
 
         // Read when it is asked for, so a test or a command can set the settings first.
         $this->app->bind(DatabaseClient::class, static fn (Application $app): DatabaseClient => new DatabaseClient(
@@ -76,6 +80,20 @@ final class BrewlessServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * PostgreSQL and MySQL connections try a query again for a while after
+     * their connection went away (see RetriesLostConnections). An application
+     * that made a connection class of its own for a driver keeps it.
+     */
+    private function retryLostConnections(): void
+    {
+        foreach (['pgsql' => PostgresConnection::class, 'mysql' => MySqlConnection::class] as $driver => $class) {
+            if (Connection::getResolver($driver) === null) {
+                Connection::resolverFor($driver, static fn (mixed $pdo, string $database, string $prefix, array $config): Connection => new $class($pdo, $database, $prefix, $config));
+            }
+        }
+    }
+
     private static function setting(string $key): ?string
     {
         $value = config($key);
@@ -91,7 +109,7 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $defaults = require __DIR__.'/../config/brewless.php';
 
-        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases'] as $section) {
+        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases', 'database'] as $section) {
             config(['brewless.'.$section => array_replace($defaults[$section], (array) config('brewless.'.$section))]);
         }
     }

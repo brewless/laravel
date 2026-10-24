@@ -124,6 +124,18 @@ attribute `brewless.preview` when it came in on the test address.
 
 A cache at Scaleway (`cache` in `brewless.yml`) is a Managed Database for Redis on the Private Network of your project, reached over TLS with a certificate of its own cluster. Brewless gives the application that certificate as `BREWLESS_REDIS_CA` (base64), next to `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME` and `REDIS_PASSWORD`. With it, the package makes the `default` and `cache` redis connections speak TLS and trust that certificate and no other (`brewless.redis.connections` names them). The host is an address on the Private Network, which no certificate names, so the name is not checked; the certificate is. Without the variable your redis connections are left as you configured them.
 
+### Through a database restart
+
+A managed database is sometimes restarted: Scaleway's Serverless SQL Database
+disconnects its clients for at most a minute during maintenance, by default on
+Tuesdays between 14:30 and 14:45 CEST. Laravel reconnects and runs a query once
+when its connection went away, at once, which is too early then. The package
+gives the `pgsql` and `mysql` drivers a connection that tries the query again
+with pauses of 1, 2, 4 and then 8 seconds, for up to `BREWLESS_DB_RETRY_SECONDS`
+(60). Never inside a transaction, as in Laravel: what ran before in it went
+with the connection. An application with a connection class of its own for a
+driver keeps it.
+
 ### A database per tenant
 
 An application that gives every customer of its own a database of its own
@@ -233,6 +245,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_REDIS_CA` | The certificate of the cache's cluster, base64; the redis connections then speak TLS and trust only that certificate |
 | `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY`, `SQS_ENDPOINT` | The key and address of a queue at Scaleway Queues; handed to the `sqs` connection, which otherwise shares `AWS_*` with the `s3` disk |
 | `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT`, `BREWLESS_DATABASES_KEY` | Where and as which environment to ask Brewless for a database per tenant, and the key to sign with; set by Brewless with `databases` in `brewless.yml` |
+| `BREWLESS_DB_RETRY_SECONDS` | How long a query whose connection went away is tried again (`60`); `0` keeps Laravel's single try |
 | `RELEASE` | The running image; set by Brewless on each release |
 
 Other release commands, queue time and tries, or more commands to refuse:

@@ -58,9 +58,11 @@ brewless logs production --source=release
 - Use `queue: sqs` instead of `queue: database` for a sleeping database.
 - It holds one database. Environments that share it share its tables.
 - It uses `DB_SSLMODE`. Keep the connection's `sslmode` reading that variable.
+- Scaleway restarts it for maintenance, by default on Tuesdays between 14:30 and 14:45 CEST, disconnecting clients for at most a minute. `brewless/laravel` tries a query again for up to `BREWLESS_DB_RETRY_SECONDS` (60) after a lost connection, outside transactions. Keep transactions short, and do not schedule releases in that window.
 
 ## Queues
 
+- `queue: sqs` is the default and the choice to recommend: a job wakes the worker, which sleeps in between. `queue: database` has the worker called every minute to look for jobs, so it never sleeps and Scaleway bills it around the clock. Only choose it when the user is sure, and say what it costs.
 - `queue: sqs` puts the queue key in `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY` and `SQS_ENDPOINT`. `brewless/laravel` hands these to the `sqs` connection, so `AWS_*` stays free for the `s3` disk.
 - Scaleway Queues refuses `Queue::size()`.
 
