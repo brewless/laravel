@@ -49,8 +49,11 @@ test('without the edge secret the forwarded address is dropped, so nobody picks 
     'not an address' => [['X-Brewless-Edge' => TestCase::EDGE_SECRET, 'X-Forwarded-For' => 'unknown']],
 ]);
 
-test('an application without an edge keeps the forwarded address it was given', function (): void {
+test('an application without an edge keeps the address its provider appended, and nothing a visitor put in front', function (): void {
     config(['brewless.edge.secret' => null]);
 
     $this->get('/address', ['X-Forwarded-For' => '203.0.113.7'])->assertSee('forwarded:203.0.113.7');
+    // A visitor who writes an address of their choosing in front gets the one the provider saw.
+    $this->get('/address', ['X-Forwarded-For' => '1.2.3.4, 203.0.113.7'])->assertSee('forwarded:203.0.113.7');
+    $this->get('/address', ['X-Forwarded-For' => 'not-an-address'])->assertDontSee('not-an-address');
 });
