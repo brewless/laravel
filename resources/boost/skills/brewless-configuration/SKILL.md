@@ -80,6 +80,7 @@ environments:
 - **Sizes.** Memory is 128 to 12288 MB and CPU 70 to 6000. Memory must be at least the CPU and at most 4 times it. Give one and the other follows Scaleway's pairing.
 - **Timeouts** are 10 to 3600 seconds.
 - Sizes and scale set in the file cannot be changed with `brewless scale` or in the console.
+- **Firewall.** With bunny.net in front, `firewall` puts bunny.net Shield on the pull zone: `rate_limit` is the requests one address may make in 10 seconds before it is blocked for a minute (Shield Basic, free), `bot_control` is `challenge`, `log` or `off`. Bot control takes Shield Advanced or higher, which costs money at bunny.net: ask the user before adding it, and never change the Shield plan yourself. `firewall: false` removes what Brewless set. See https://docs.brewless.eu/running/firewall.
 
 ## Server files
 

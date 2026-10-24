@@ -3,7 +3,7 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
-## Unreleased
+## 0.11.0 (24 October 2026)
 
 - The right ops secret, and a queued job whose signature holds, always pass. Before, an address that gave a wrong secret ten times in a minute got a 404 for a minute whatever it sent, so anyone guessing from the same address as Brewless (the provider's front end, or the container's public `*.scw.cloud` address) could shut Brewless out of its release commands, the scheduler tick and the queue trigger. A wrong secret is still counted per address and answered with the same 404, and the address that reaches `ops.max_failures` is logged once (`brewless: an address keeps giving a wrong ops secret`).
 
@@ -12,6 +12,10 @@ version may change a route or a setting.
   - Each delivery runs once within that time, marked in the application's default cache by its signature: one that comes again is dropped, one that another request is still handling is answered with a 409 so the provider tries it again later. A delivery whose container stopped before it answered runs again after `ops.time_limit` (and a minute). A job that went back on its queue is a new delivery and runs. Without a cache that answers, a delivery runs.
   - **Upgrading:** a job signed by 0.10 or earlier carries no signing moment and is dropped (with a warning in the log). Let the queue at the provider run empty before updating, or accept that jobs queued just before the update are lost. Jobs on the `database` queue worked by `queue:work` are not checked and are not affected.
 - A failure on an ops route or of a queued job is answered with `ok: false` and reported to the application's log, no longer with the exception's message, which may quote the data it failed on. A release command that fails is still named (`Release command "…" failed.` or `… ended with exit code …`), so Brewless can say which one stopped the release; why it failed is only in the log. The answer to a delivered job that broke is `{"ok": false}`.
+
+## 0.10.1 (24 October 2026)
+
+- The `brewless-configuration` skill describes `firewall` in `brewless.yml`, and tells an agent to ask before it adds bot control: that takes a paid Shield plan at bunny.net.
 
 ## 0.10.0 (24 October 2026)
 
