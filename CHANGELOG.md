@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.10.1 (24 October 2026)
+
+- The `brewless-configuration` skill describes `firewall` in `brewless.yml`, and tells an agent to ask before it adds bot control: that takes a paid Shield plan at bunny.net.
+
 ## 0.10.0 (24 October 2026)
 
 - Without an edge secret, `X-Forwarded-For` keeps only the address the provider's own front end appended (the last entry, or as many as `BREWLESS_EDGE_HOPS` says), instead of the whole header as it arrived. A visitor who writes an address in front no longer chooses the one rate limits count. With an edge secret nothing changes.
