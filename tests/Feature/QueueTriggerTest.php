@@ -227,3 +227,13 @@ test('a job signed under another application key is dropped', function (): void 
 
     expect(Cache::get('ran'))->toBeNull();
 });
+
+test('a signed job runs from an address that guessed the ops secret wrong too often', function (): void {
+    foreach (range(1, 15) as $guess) {
+        $this->getJson('/_ops/status', ['X-Brewless-Ops' => 'guess-'.$guess])->assertNotFound();
+    }
+
+    deliver(queuedMessage(new RememberThatItRan('still delivered')))->assertOk()->assertJsonPath('state', 'done');
+
+    expect(Cache::get('ran'))->toBe('still delivered');
+});

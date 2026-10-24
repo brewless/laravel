@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## Unreleased
+
+- The right ops secret, and a queued job whose signature holds, always pass. Before, an address that gave a wrong secret ten times in a minute got a 404 for a minute whatever it sent, so anyone guessing from the same address as Brewless (the provider's front end, or the container's public `*.scw.cloud` address) could shut Brewless out of its release commands, the scheduler tick and the queue trigger. A wrong secret is still counted per address and answered with the same 404, and the address that reaches `ops.max_failures` is logged once (`brewless: an address keeps giving a wrong ops secret`).
+
 ## 0.10.0 (24 October 2026)
 
 - Without an edge secret, `X-Forwarded-For` keeps only the address the provider's own front end appended (the last entry, or as many as `BREWLESS_EDGE_HOPS` says), instead of the whole header as it arrived. A visitor who writes an address in front no longer chooses the one rate limits count. With an edge secret nothing changes.

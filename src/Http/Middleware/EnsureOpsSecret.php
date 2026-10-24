@@ -21,11 +21,16 @@ use Throwable;
  * the provider can only send a body). A queue trigger of the provider sends
  * the job itself, signed by this application (JobSignature).
  *
- * An address that keeps guessing is shut out for a minute, with the same
- * 404, so the secret cannot be found by trying. The guesses are counted in
- * the application's cache; when that cannot be reached, the secret alone
- * decides. The cache of a new application may live in a database whose
- * tables only the release commands behind this door make.
+ * The secret is compared first: a request with the right secret, or with a
+ * job whose signature holds, always passes. Only a failed attempt is
+ * counted, per address, in the application's cache, and an address that
+ * reaches `ops.max_failures` in a minute is logged once. It is not shut out:
+ * behind the provider's front end many callers may share one address, and
+ * someone guessing there would otherwise shut Brewless out of its own
+ * release, tick and queue. What keeps the secret from being found by trying
+ * is its length; Brewless makes it long and random. When the cache cannot be
+ * reached, nothing is counted: the cache of a new application may live in a
+ * database whose tables only the release commands behind this door make.
  *
  * PHP ends a web request after 30 seconds by default (`max_execution_time`
  * in php.ini-production), shorter than release commands, a queue run or a
@@ -41,19 +46,25 @@ final class EnsureOpsSecret
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $key = 'brewless-ops-secret:'.$request->ip();
-
-        abort_if($this->counted(static fn (): bool => RateLimiter::tooManyAttempts($key, (int) config('brewless.ops.max_failures'))) === true, 404);
-
         $secret = config('brewless.ops.secret');
         $given = $request->headers->get((string) config('brewless.ops.secret_header')) ?? $request->json('secret');
+
+        if (! is_string($secret) || $secret === '') {
+            $this->refuse($request);
+        }
+
+        if (is_string($given) && hash_equals($secret, $given)) {
+            $this->allowTheTime();
+
+            return $next($request);
+        }
 
         // A job the provider's queue trigger delivers carries no secret of ours,
         // only the signature this application put on it, with the key
         // every container derives from the application key. One whose signature
         // does not hold is answered, not run: refused, the provider would
         // deliver it again every half minute, without end.
-        if ($given === null && is_string($secret) && $secret !== '' && $request->routeIs('brewless.ops.trigger')) {
+        if ($given === null && $request->routeIs('brewless.ops.trigger')) {
             $payload = json_decode($request->getContent(), true);
 
             if (is_array($payload) && JobSignature::isJob($payload)) {
@@ -80,15 +91,22 @@ final class EnsureOpsSecret
             }
         }
 
-        if (! is_string($secret) || $secret === '' || ! is_string($given) || ! hash_equals($secret, $given)) {
-            $this->counted(static fn (): int => RateLimiter::hit($key));
+        $this->refuse($request);
+    }
 
-            abort(404);
+    /**
+     * Count the failed attempt of this address and answer as if the route did
+     * not exist. The address that reaches the limit is logged, once a minute.
+     */
+    private function refuse(Request $request): never
+    {
+        $failures = $this->counted(static fn (): int => RateLimiter::hit('brewless-ops-secret:'.$request->ip()));
+
+        if ($failures === (int) config('brewless.ops.max_failures')) {
+            Log::warning('brewless: an address keeps giving a wrong ops secret', ['ip' => $request->ip()]);
         }
 
-        $this->allowTheTime();
-
-        return $next($request);
+        abort(404);
     }
 
     /**

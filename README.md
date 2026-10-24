@@ -63,8 +63,12 @@ that throw data away (`migrate:fresh`, `db:wipe`, …) are refused on
 `/_ops/command`, and as release commands sent along with a release.
 Brewless sends the release commands and queues of your project's
 `brewless.yml`; without them the commands of `ops.release_commands` and the
-default queue are used. An address that gives a wrong secret ten times in a minute
-gets the same 404 for a minute, whatever it sends. A tick that finds no job
+default queue are used. Every wrong secret gets the same 404 and is counted
+per address; an address that gives a wrong secret ten times in a minute is
+logged. It is not shut out: the right secret, or a job whose signature holds,
+always passes, so someone guessing behind the same address as Brewless (the
+provider's front end) cannot lock Brewless out. What keeps the secret from
+being found by trying is its length. A tick that finds no job
 due does not start a worker, so an idle application costs a single query.
 
 ### The visitor's hostname behind the edge

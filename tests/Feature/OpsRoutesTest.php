@@ -8,6 +8,8 @@ use Brewless\Laravel\Tests\TestCase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -146,17 +148,36 @@ test('a command that never ends, is unknown or is not one line does not run', fu
     $this->postJson('/_ops/command', [], $this->ops())->assertUnprocessable();
 });
 
-test('an address that keeps guessing the secret is shut out, with the same 404', function (): void {
-    foreach (range(1, 10) as $guess) {
+test('an address that keeps guessing gets the same 404, and the guesses are counted', function (): void {
+    Log::spy();
+
+    foreach (range(1, 12) as $guess) {
         $this->getJson('/_ops/status', ['X-Brewless-Ops' => 'guess-'.$guess])->assertNotFound();
     }
 
-    // The right secret no longer helps this address for a minute; another address is unaffected.
-    $this->getJson('/_ops/status', $this->ops())->assertNotFound();
-    $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.7'])->getJson('/_ops/status', $this->ops())->assertOk();
+    expect(RateLimiter::attempts('brewless-ops-secret:127.0.0.1'))->toBe(12);
 
-    $this->travel(61)->seconds();
-    $this->withServerVariables([])->getJson('/_ops/status', $this->ops())->assertOk();
+    // Said once, when the address reaches the limit; never what it sent.
+    Log::shouldHaveReceived('warning')->withArgs(fn (string $message, array $context): bool => $message === 'brewless: an address keeps giving a wrong ops secret'
+        && $context === ['ip' => '127.0.0.1'])->once();
+});
+
+test('the right secret always passes, also from an address that guessed wrong too often', function (): void {
+    // Behind the provider's front end many callers may share one address. Someone
+    // guessing there must not shut Brewless out of its own release, tick or queue.
+    foreach (range(1, 15) as $guess) {
+        $this->getJson('/_ops/status', ['X-Brewless-Ops' => 'guess-'.$guess])->assertNotFound();
+    }
+
+    $this->getJson('/_ops/status', $this->ops())->assertOk();
+    $this->postJson('/', ['secret' => TestCase::OPS_SECRET, 'task' => 'tick'])->assertOk();
+    $this->postJson('/_ops/migrate', [], $this->ops())->assertOk();
+
+    // A right secret is not counted as a guess.
+    expect(RateLimiter::attempts('brewless-ops-secret:127.0.0.1'))->toBe(15);
+
+    // And a wrong one still gets nothing.
+    $this->getJson('/_ops/status', ['X-Brewless-Ops' => 'guess-16'])->assertNotFound();
 });
 
 test('on a database without tables yet, the right secret still runs the release commands that make them', function (): void {

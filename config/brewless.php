@@ -25,7 +25,8 @@ return [
         // take longer. The container's own timeout at the provider still applies.
         'time_limit' => 900,
 
-        // Wrong secrets an address may give per minute. After that it gets the same 404 for a minute, right or wrong.
+        // Wrong secrets an address may give per minute before it is logged. It is
+        // never shut out: the right secret, or a signed job, always passes.
         'max_failures' => 10,
 
         // What runs before a release goes live, in this order. If one fails, the release does not go live.
