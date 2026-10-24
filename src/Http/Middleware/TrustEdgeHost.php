@@ -22,8 +22,12 @@ use Symfony\Component\HttpFoundation\Response;
  * so only the last entries count: as many as there are proxies
  * (`brewless.edge.hops`), and only with the secret. Without it the header is
  * dropped, so a request that did not come through the edge cannot choose its
- * own address either. An application without an edge secret has no edge, and
- * its headers are left alone.
+ * own address either.
+ *
+ * An application without an edge secret has no edge in front, but still the
+ * provider's own front end, which appends the address it saw as the last
+ * entry. Only that entry is kept: what a visitor wrote in front of it is not
+ * believed, so rate limits count the real visitor here too.
  */
 final class TrustEdgeHost
 {
@@ -35,6 +39,8 @@ final class TrustEdgeHost
         $secret = config('brewless.edge.secret');
 
         if (! is_string($secret) || $secret === '') {
+            $this->keepOnly($request, $this->visitorAddress($request));
+
             return $next($request);
         }
 
@@ -48,20 +54,26 @@ final class TrustEdgeHost
             $request->server->set('SERVER_NAME', $host);
         }
 
-        $address = $fromEdge ? $this->visitorAddress($request) : null;
-
-        if ($address === null) {
-            $request->headers->remove('X-Forwarded-For');
-            $request->server->remove('HTTP_X_FORWARDED_FOR');
-        } else {
-            $request->headers->set('X-Forwarded-For', $address);
-            $request->server->set('HTTP_X_FORWARDED_FOR', $address);
-        }
+        $this->keepOnly($request, $fromEdge ? $this->visitorAddress($request) : null);
 
         // The secret has done its job; nothing further down needs to see it.
         $request->headers->remove((string) config('brewless.edge.secret_header'));
 
         return $next($request);
+    }
+
+    /** X-Forwarded-For as only this address, or without it. */
+    private function keepOnly(Request $request, ?string $address): void
+    {
+        if ($address === null) {
+            $request->headers->remove('X-Forwarded-For');
+            $request->server->remove('HTTP_X_FORWARDED_FOR');
+
+            return;
+        }
+
+        $request->headers->set('X-Forwarded-For', $address);
+        $request->server->set('HTTP_X_FORWARDED_FOR', $address);
     }
 
     private function edgeHost(Request $request): ?string
