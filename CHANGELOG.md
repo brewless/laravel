@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.10.0 (24 October 2026)
+
+- Without an edge secret, `X-Forwarded-For` keeps only the address the provider's own front end appended (the last entry, or as many as `BREWLESS_EDGE_HOPS` says), instead of the whole header as it arrived. A visitor who writes an address in front no longer chooses the one rate limits count. With an edge secret nothing changes.
+
 ## 0.9.0 (23 October 2026)
 
 - Guidelines and skills for coding agents, in `resources/boost`. Laravel Boost finds them by itself (`boost:install`, `boost:update`).

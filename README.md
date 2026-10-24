@@ -80,8 +80,10 @@ The visitor's address is treated the same way. With an edge secret set, only
 the entry the edge appended to `X-Forwarded-For` is kept, and a request
 without the secret loses the header, so rate limits count the real visitor
 and nobody chooses their own address. `BREWLESS_EDGE_HOPS` says how many
-proxies append to the header (default 1). Without an edge secret the header
-is left as it arrived.
+proxies append to the header (default 1). Without an edge secret there is no
+edge, but there is the provider's own front end, which appends the address it
+saw as the last entry: only that entry is kept, so a visitor cannot choose
+their own address there either.
 
 ### The test address
 
