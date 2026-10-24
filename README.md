@@ -58,6 +58,24 @@ and the failed jobs table. The answer is always a success, also for a job
 that failed or that was dropped: the provider would otherwise deliver it
 again every half minute, without end.
 
+A signed job also carries the moment it was signed and its attempts, so a
+message that was seen once cannot be posted again at will. It is good for
+`ops.job_max_age` seconds (`BREWLESS_JOB_MAX_AGE`, 3600) and dropped after
+that, or when it was signed more than a minute ahead of the container's
+clock. Within that time each delivery runs once: one that comes again is
+dropped, and one that is still being handled by another request gets a 409,
+so the provider tries it again later (a delivery whose container stopped
+before it answered runs again after `ops.time_limit`). A job that goes back
+on its queue, and a failed job that is retried, is signed again and runs as
+a delivery of its own. The marks are kept in the application's default
+cache; give the containers a cache they share (redis, the database), or a
+delivery to another container is not recognised. Without a cache that
+answers, a delivery runs.
+
+A failure is answered with `ok: false` and reported to the application's
+log, never with its reason; a release command that fails is named, so
+Brewless can say which one stopped the release.
+
 Commands that never return (`queue:work`, `tinker`, `serve`, …) and commands
 that throw data away (`migrate:fresh`, `db:wipe`, …) are refused on
 `/_ops/command`, and as release commands sent along with a release.
@@ -211,6 +229,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_EDGE_HOPS` | Proxies between the visitor and the container (`1`) |
 | `BREWLESS_PREVIEW_DOMAINS` | Comma-separated test domains (`brewless.dev`); empty turns the test address off |
 | `BREWLESS_HEARTBEAT_STORE` | Cache store for the sign of life (`file`) |
+| `BREWLESS_JOB_MAX_AGE` | Seconds a job signed for a queue trigger is good for (`3600`) |
 | `BREWLESS_REDIS_CA` | The certificate of the cache's cluster, base64; the redis connections then speak TLS and trust only that certificate |
 | `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY`, `SQS_ENDPOINT` | The key and address of a queue at Scaleway Queues; handed to the `sqs` connection, which otherwise shares `AWS_*` with the `s3` disk |
 | `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT`, `BREWLESS_DATABASES_KEY` | Where and as which environment to ask Brewless for a database per tenant, and the key to sign with; set by Brewless with `databases` in `brewless.yml` |

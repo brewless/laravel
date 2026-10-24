@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use Brewless\Laravel\BrewlessServiceProvider;
 use Brewless\Laravel\Ops\Heartbeat;
+use Brewless\Laravel\Ops\ReleaseFailed;
 use Brewless\Laravel\Tests\TestCase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
@@ -81,13 +83,27 @@ test('a release runs the release commands and answers with what they printed', f
         ->assertJsonStructure(['migrate', 'seconds']);
 });
 
-test('a release command that fails answers 500 with the reason, so the release does not go live', function (): void {
+test('a release command that fails answers 500 naming the command, so the release does not go live', function (): void {
+    Exceptions::fake();
     config(['brewless.ops.release_commands' => ['migrate --force', 'this:does-not-exist']]);
 
     $this->postJson('/_ops/migrate', [], $this->ops())
         ->assertStatus(500)
-        ->assertJsonPath('ok', false)
-        ->assertJsonStructure(['error']);
+        ->assertExactJson(['ok' => false, 'error' => 'Release command "this:does-not-exist" failed.']);
+
+    // Why it failed is the application's own error, which may quote data: it goes to the log.
+    Exceptions::assertReported(fn (ReleaseFailed $exception): bool => str_contains((string) $exception->getPrevious()?->getMessage(), 'this:does-not-exist'));
+});
+
+test('an operation that breaks answers 500 without the reason, which is reported instead', function (): void {
+    Exceptions::fake();
+    config(['brewless.ops.heartbeat_store' => 'a-store-that-does-not-exist']);
+
+    $this->postJson('/_ops/schedule', [], $this->ops())
+        ->assertStatus(500)
+        ->assertExactJson(['ok' => false]);
+
+    Exceptions::assertReported(InvalidArgumentException::class);
 });
 
 test('a tick plans and works, and leaves a sign of life outside the database', function (): void {

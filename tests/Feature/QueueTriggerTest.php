@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Brewless\Laravel\Queue\Deliveries;
 use Brewless\Laravel\Queue\JobSignature;
 use Brewless\Laravel\Tests\TestCase;
 use Illuminate\Bus\Queueable;
@@ -9,6 +10,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
@@ -37,6 +39,44 @@ final class AlwaysFails implements ShouldQueue
     {
         throw new RuntimeException('it failed');
     }
+}
+
+final class CountsItsRuns implements ShouldQueue
+{
+    use Queueable;
+
+    public function handle(): void
+    {
+        Cache::increment('runs');
+    }
+}
+
+final class FailsUntilFixed implements ShouldQueue
+{
+    use Queueable;
+
+    public int $tries = 1;
+
+    public function handle(): void
+    {
+        if (Cache::get('fixed') !== true) {
+            throw new RuntimeException('not fixed yet');
+        }
+
+        Cache::put('ran', 'fixed');
+    }
+}
+
+/**
+ * Sign a payload again with the application's key, as only the application can.
+ *
+ * @param  array<string, mixed>  $payload
+ */
+function signedAgain(array $payload): string
+{
+    unset($payload[JobSignature::KEY]);
+
+    return (string) json_encode([...$payload, JobSignature::KEY => JobSignature::sign($payload, (string) JobSignature::key())]);
 }
 
 /**
@@ -165,15 +205,105 @@ test('a failing job goes back on its queue counting its attempt, and after its t
 
     expect($again->queue)->toBe('mails')
         ->and($payload[JobSignature::ATTEMPTS])->toBe(1)
-        // Still signed: the attempts are not part of what is signed.
-        ->and(JobSignature::holdsForApplication($payload))->toBeTrue();
+        // Signed again, with its attempt and the moment it went back.
+        ->and(JobSignature::holdsForApplication($payload))->toBeTrue()
+        ->and($payload[JobSignature::SIGNED_AT])->toBeInt();
 
     DB::table('jobs')->delete();
 
+    // The provider delivers the new message: it runs, though the first one did.
     deliver((string) $again->payload)->assertOk()->assertJsonPath('state', 'failed');
 
     expect(DB::table('jobs')->count())->toBe(0)
         ->and(DB::table('failed_jobs')->count())->toBe(1);
+});
+
+test('a delivery that was handled is dropped when it comes again', function (): void {
+    $message = queuedMessage(new CountsItsRuns);
+
+    deliver($message)->assertOk()->assertJsonPath('state', 'done');
+    deliver($message)->assertOk()->assertJsonPath('dropped', true);
+    deliver(reencoded($message))->assertOk()->assertJsonPath('dropped', true);
+
+    expect(Cache::get('runs'))->toBe(1);
+});
+
+test('a delivery that is still being handled is answered so the provider tries again, and runs again once that is over', function (): void {
+    $message = queuedMessage(new CountsItsRuns);
+
+    // Another request took it and never answered, as when its container stopped.
+    expect(Deliveries::claim(json_decode($message, true)))->toBe(Deliveries::RUN);
+
+    deliver($message)->assertStatus(409)->assertExactJson(['ok' => false]);
+    expect(Cache::get('runs'))->toBeNull();
+
+    $this->travel((int) config('brewless.ops.time_limit') + 61)->seconds();
+
+    deliver($message)->assertOk()->assertJsonPath('state', 'done');
+    expect(Cache::get('runs'))->toBe(1);
+});
+
+test('a job signed longer ago than ops.job_max_age is dropped, a younger one runs', function (): void {
+    $old = queuedMessage(new CountsItsRuns);
+    $this->travel(59)->minutes();
+    $young = queuedMessage(new CountsItsRuns);
+    $this->travel(2)->minutes();
+
+    deliver($old)->assertOk()->assertJsonPath('dropped', true);
+    deliver($young)->assertOk()->assertJsonPath('state', 'done');
+
+    expect(Cache::get('runs'))->toBe(1);
+});
+
+test('a job signed in the future is dropped', function (): void {
+    $this->travel(5)->minutes();
+    $message = queuedMessage(new CountsItsRuns);
+    $this->travelBack();
+
+    deliver($message)->assertOk()->assertJsonPath('dropped', true);
+
+    expect(Cache::get('runs'))->toBeNull();
+});
+
+test('a job without the moment it was signed, as 0.10 signed it, is dropped', function (): void {
+    $payload = json_decode(queuedMessage(new CountsItsRuns), true);
+    unset($payload[JobSignature::SIGNED_AT]);
+
+    deliver(signedAgain($payload))->assertOk()->assertJsonPath('dropped', true);
+
+    expect(Cache::get('runs'))->toBeNull();
+});
+
+test('the attempts and the moment are signed, so a delivery cannot be made new by changing them', function (): void {
+    $payload = json_decode(queuedMessage(new CountsItsRuns), true);
+
+    deliver((string) json_encode([...$payload, JobSignature::ATTEMPTS => 1]))->assertOk()->assertJsonPath('dropped', true);
+    deliver((string) json_encode([...$payload, JobSignature::SIGNED_AT => $payload[JobSignature::SIGNED_AT] + 1]))->assertOk()->assertJsonPath('dropped', true);
+
+    expect(Cache::get('runs'))->toBeNull();
+});
+
+test('a failed job that is retried long after still runs', function (): void {
+    deliver(queuedMessage(new FailsUntilFixed))->assertOk()->assertJsonPath('state', 'failed');
+
+    $this->travel(3)->hours();
+    Cache::put('fixed', true);
+
+    $this->postJson('/_ops/queue/retry', [], $this->ops())->assertOk()->assertJsonPath('retried', 1);
+
+    deliver((string) DB::table('jobs')->value('payload'))->assertOk()->assertJsonPath('state', 'done');
+
+    expect(Cache::get('ran'))->toBe('fixed');
+});
+
+test('a delivery that breaks is answered without the reason, which is reported instead', function (): void {
+    Exceptions::fake();
+    // The sign of life after the job cannot be left.
+    config(['brewless.ops.heartbeat_store' => 'a-store-that-does-not-exist']);
+
+    deliver(queuedMessage(new CountsItsRuns))->assertOk()->assertExactJson(['ok' => false]);
+
+    Exceptions::assertReported(InvalidArgumentException::class);
 });
 
 test('the status names the moments of the schedule, so the scheduler is only called then', function (): void {

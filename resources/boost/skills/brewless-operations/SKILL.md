@@ -51,6 +51,7 @@ brewless command production "cache:clear"     # asks for confirmation on product
 - Give a worker that runs long jobs a `worker.timeout` in `brewless.yml` above the longest job.
 - **Failed jobs** stay in the application's own `failed_jobs` table; Brewless never reads why a job failed. They can be put back on the queue from the console (Queues tab).
 - A job queued by the application is signed by `brewless/laravel`. Do not replace the `sqs` or `database` queue connectors.
+- A signed job is good for `BREWLESS_JOB_MAX_AGE` seconds (3600) and each delivery runs once. Do not post a queue message to the container yourself to run it again; retry a failed job with `/_ops/queue/retry`, which signs it again.
 
 ## Scaling
 

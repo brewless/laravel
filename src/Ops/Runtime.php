@@ -15,7 +15,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use RuntimeException;
 use Throwable;
 
 /**
@@ -42,7 +41,12 @@ final class Runtime
         $printed = [];
 
         foreach ((array) config('brewless.ops.release_commands') as $command) {
-            Artisan::call((string) $command.' --no-interaction');
+            try {
+                Artisan::call((string) $command.' --no-interaction');
+            } catch (Throwable $exception) {
+                throw new ReleaseFailed('Release command "'.trim((string) $command).'" failed.', previous: $exception);
+            }
+
             $printed[strtok((string) $command, ' ') ?: 'command'] = Artisan::output();
         }
 
@@ -65,7 +69,7 @@ final class Runtime
             $name = strtok(trim($command), ' ') ?: '';
 
             if (in_array($name, (array) config('brewless.ops.never_ending'), true) || in_array($name, (array) config('brewless.ops.destructive'), true)) {
-                throw new RuntimeException('Release command "'.$name.'" is refused: it never ends or throws data away.');
+                throw new ReleaseFailed('Release command "'.$name.'" is refused: it never ends or throws data away.');
             }
         }
 
@@ -73,11 +77,17 @@ final class Runtime
         $printed = [];
 
         foreach ($commands as $command) {
-            $exitCode = Artisan::call(trim($command).' --no-interaction');
+            try {
+                $exitCode = Artisan::call(trim($command).' --no-interaction');
+            } catch (Throwable $exception) {
+                // Named, not explained: the error may quote the data it failed on. It is reported in full.
+                throw new ReleaseFailed('Release command "'.trim($command).'" failed.', previous: $exception);
+            }
+
             $printed[trim($command)] = Str::limit(Artisan::output(), self::OUTPUT_LIMIT);
 
             if ($exitCode !== 0) {
-                throw new RuntimeException('Release command "'.trim($command).'" ended with exit code '.$exitCode.'.');
+                throw new ReleaseFailed('Release command "'.trim($command).'" ended with exit code '.$exitCode.'.');
             }
         }
 

@@ -36,6 +36,13 @@ return [
         // database: that would be a write every minute to say nothing happened.
         'heartbeat_store' => env('BREWLESS_HEARTBEAT_STORE', 'file'),
 
+        // How long a job signed for a queue trigger is good for, in seconds,
+        // counted from when it was queued (or queued again). A message that
+        // arrives later is dropped, and within this time each delivery runs
+        // once. Longer than the longest delay a queue at the provider takes
+        // (15 minutes) plus the time a message may wait for the container.
+        'job_max_age' => (int) env('BREWLESS_JOB_MAX_AGE', 3600),
+
         // One call works the queue for at most this long: inside one trigger interval and one request.
         'queue_seconds' => 45,
         'queue_tries' => 3,

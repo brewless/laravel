@@ -53,7 +53,8 @@ final class TriggeredJob extends Job implements JobContract
     }
 
     /**
-     * Put the job back as a new message, one attempt further, after the delay.
+     * Put the job back as a new message, one attempt further, after the delay,
+     * signed again: the attempts and the moment are part of what is signed.
      *
      * @param  int  $delay
      */
@@ -62,7 +63,7 @@ final class TriggeredJob extends Job implements JobContract
         parent::release($delay);
 
         $this->container['queue']->connection($this->connectionName)->pushRaw(
-            (string) json_encode([...$this->payload, JobSignature::ATTEMPTS => $this->attempts()]),
+            (string) json_encode(JobSignature::resign([...$this->payload, JobSignature::ATTEMPTS => $this->attempts()])),
             $this->queue,
             $delay > 0 ? ['DelaySeconds' => min((int) $delay, self::MAX_DELAY)] : [],
         );

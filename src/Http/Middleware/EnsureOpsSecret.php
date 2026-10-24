@@ -84,6 +84,18 @@ final class EnsureOpsSecret
                     return response()->json(['ok' => false, 'dropped' => true]);
                 }
 
+                // Signed by this application, but longer ago than a signed job is
+                // good for, or ahead of the clock: a message someone kept, or one
+                // signed before 0.11 without its moment.
+                if (! JobSignature::isFresh($payload)) {
+                    Log::warning('brewless: a queue message signed too long ago was dropped', [
+                        'uuid' => $payload['uuid'],
+                        'signed_at' => is_int($payload[JobSignature::SIGNED_AT] ?? null) ? $payload[JobSignature::SIGNED_AT] : null,
+                    ]);
+
+                    return response()->json(['ok' => false, 'dropped' => true]);
+                }
+
                 $request->attributes->set(self::SIGNED_JOB, $payload);
                 $this->allowTheTime();
 

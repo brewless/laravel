@@ -13,6 +13,8 @@ use function is_string;
 use function json_decode;
 use function json_encode;
 use function ksort;
+use function max;
+use function now;
 
 /**
  * A job this application put on its queue carries a signature made with a key
@@ -22,8 +24,10 @@ use function ksort;
  *
  * The signature covers the whole payload: the job's identifier, its
  * handler, its data and whatever other packages add, such as the tenant it
- * runs for. The attempts are counted next to it and are not covered:
- * changing them only changes when a job is given up.
+ * runs for, the attempts counted before, and the moment it was signed. A job
+ * that goes back on its queue is signed again, with its new attempt and a new
+ * moment. So a delivery is only good for `ops.job_max_age` seconds, and within
+ * that time Deliveries runs each one once.
  */
 final class JobSignature
 {
@@ -41,6 +45,67 @@ final class JobSignature
 
     /** How often a job was tried before, counted here because the provider's trigger does not say. */
     public const string ATTEMPTS = 'brewless_attempts';
+
+    /** When the job was signed, in seconds since the epoch: when it was queued, or queued again. */
+    public const string SIGNED_AT = 'brewless_signed_at';
+
+    /** How far a signing moment may lie ahead of this container's clock, in seconds. */
+    public const int CLOCK_SKEW = 60;
+
+    /**
+     * Mark a payload with the moment and sign it with the key given.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<array-key, mixed>
+     */
+    public static function stamp(array $payload, string $key): array
+    {
+        unset($payload[self::KEY]);
+        $payload[self::SIGNED_AT] = now()->getTimestamp();
+
+        return [...$payload, self::KEY => self::sign($payload, $key)];
+    }
+
+    /**
+     * Sign a job of this application again with the application key, for now:
+     * one that goes back on its queue, or a failed job that is retried. Without
+     * an application key it is left as it is, and dropped where it arrives.
+     *
+     * @param  array<array-key, mixed>  $payload
+     * @return array<array-key, mixed>
+     */
+    public static function resign(array $payload): array
+    {
+        $key = self::key();
+
+        return $key === null ? $payload : self::stamp($payload, $key);
+    }
+
+    /**
+     * Whether the job was signed within `ops.job_max_age` seconds, and not
+     * later than a minute from now. A job without the moment, as 0.10 and
+     * earlier signed it, is not.
+     *
+     * @param  array<array-key, mixed>  $payload
+     */
+    public static function isFresh(array $payload): bool
+    {
+        $signedAt = $payload[self::SIGNED_AT] ?? null;
+
+        if (! is_int($signedAt)) {
+            return false;
+        }
+
+        $now = now()->getTimestamp();
+
+        return $signedAt <= $now + self::CLOCK_SKEW && $now - $signedAt <= self::maxAge();
+    }
+
+    /** How long a signed job is good for, in seconds. */
+    public static function maxAge(): int
+    {
+        return max((int) config('brewless.ops.job_max_age'), 1);
+    }
 
     /**
      * @param  array<array-key, mixed>  $payload
@@ -114,8 +179,8 @@ final class JobSignature
     }
 
     /**
-     * The whole payload as it was signed: everything but the signature, the
-     * attempts counted next to it, and the delay the queue adds after it.
+     * The whole payload as it was signed: everything but the signature and
+     * the delay the queue adds after it.
      * Hooks of other packages add to the payload too (a tenant, for
      * instance); they are covered as well.
      *
@@ -129,7 +194,7 @@ final class JobSignature
      */
     private static function subject(array $payload): string
     {
-        unset($payload[self::KEY], $payload[self::ATTEMPTS], $payload['delay']);
+        unset($payload[self::KEY], $payload['delay']);
 
         $content = json_decode((string) json_encode($payload), true);
 

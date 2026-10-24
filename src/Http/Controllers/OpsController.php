@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace Brewless\Laravel\Http\Controllers;
 
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
+use Brewless\Laravel\Ops\ReleaseFailed;
 use Brewless\Laravel\Ops\Runtime;
+use Brewless\Laravel\Queue\Deliveries;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
  * The routes an application's own containers answer on for Brewless. Every
- * answer is JSON with `ok`; a failure carries the reason, which is the
- * application's own error and never a credential.
+ * answer is JSON with `ok`. A failure is reported to the application's log
+ * and answered without its reason, which may quote the data it failed on;
+ * only a release command that fails is named, so Brewless can say which.
  */
 final class OpsController
 {
@@ -87,13 +91,29 @@ final class OpsController
 
         // A job from the provider's queue trigger: whatever happens to it, the
         // answer says it arrived, or the provider delivers it again and again.
+        // Each delivery runs once; one that is being handled elsewhere is
+        // answered with a 409, so the provider tries it again later.
         if (is_array($job)) {
+            $claim = Deliveries::claim($job);
+
+            if ($claim === Deliveries::DONE) {
+                Log::warning('brewless: a queue message that was handled already was dropped', ['uuid' => $job['uuid'] ?? null]);
+
+                return response()->json(['ok' => false, 'dropped' => true]);
+            }
+
+            if ($claim === Deliveries::BUSY) {
+                return response()->json(['ok' => false], 409);
+            }
+
             try {
                 return response()->json(['ok' => true] + $this->runtime->job($request->getContent(), $job));
             } catch (Throwable $exception) {
                 report($exception);
 
-                return response()->json(['ok' => false, 'error' => $exception->getMessage()]);
+                return response()->json(['ok' => false]);
+            } finally {
+                Deliveries::finish($job);
             }
         }
 
@@ -167,10 +187,14 @@ final class OpsController
     {
         try {
             return response()->json(['ok' => true] + $operation());
-        } catch (Throwable $exception) {
+        } catch (ReleaseFailed $exception) {
             report($exception);
 
             return response()->json(['ok' => false, 'error' => $exception->getMessage()], 500);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json(['ok' => false], 500);
         }
     }
 }
