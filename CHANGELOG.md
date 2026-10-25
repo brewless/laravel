@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.14.0 (25 October 2026)
+
+- With `BREWLESS_REDIS_NODES` (the nodes of a cache in cluster mode, set by Brewless with `cache.nodes` in `brewless.yml`) the `default` and `cache` redis connections become a phpredis cluster of those nodes, with their own user and password and the cluster's certificate over TLS. Without it, nothing changes.
+
 ## 0.13.0 (25 October 2026)
 
 - On the test address (a name under `brewless.dev`) the session cookie is a `__Host-` cookie: its name gets the prefix, and it is Secure, for path `/` and without a domain. All test addresses share one domain, and a browser never lets one of them set or overwrite a `__Host-` cookie of another. A visitor's session on the test address starts anew once after the update. Your own domains keep the session cookie as it was.

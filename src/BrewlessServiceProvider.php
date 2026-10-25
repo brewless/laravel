@@ -69,15 +69,59 @@ final class BrewlessServiceProvider extends ServiceProvider
             file_put_contents($file, $pem, LOCK_EX);
         }
 
+        $context = ['stream' => ['cafile' => $file, 'verify_peer' => true, 'verify_peer_name' => false]];
+        $nodes = self::redisNodes();
+
         foreach ((array) config('brewless.redis.connections') as $connection) {
-            if (! is_string($connection) || ! is_array(config('database.redis.'.$connection))) {
+            if (! is_string($connection) || ! is_array($single = config('database.redis.'.$connection))) {
                 continue;
             }
 
-            config(['database.redis.'.$connection.'.scheme' => 'tls', 'database.redis.'.$connection.'.context' => [
-                'stream' => ['cafile' => $file, 'verify_peer' => true, 'verify_peer_name' => false],
-            ]]);
+            if ($nodes === []) {
+                config(['database.redis.'.$connection.'.scheme' => 'tls', 'database.redis.'.$connection.'.context' => $context]);
+
+                continue;
+            }
+
+            // A cache in cluster mode: the connection becomes a cluster of every node, with the
+            // connection's own user and password. Laravel takes a name from `clusters` once it is
+            // gone from the single connections.
+            config([
+                'database.redis.clusters.'.$connection => [
+                    ...array_map(static fn (array $node): array => ['host' => $node['host'], 'port' => $node['port'], 'scheme' => 'tls'], $nodes),
+                    'options' => array_filter([
+                        'username' => $single['username'] ?? null,
+                        'password' => $single['password'] ?? null,
+                        'context' => $context,
+                    ], static fn (mixed $value): bool => $value !== null && $value !== ''),
+                ],
+                'database.redis.options.cluster' => 'redis',
+            ]);
+
+            $connections = (array) config('database.redis');
+            unset($connections[$connection]);
+            config(['database.redis' => $connections]);
         }
+    }
+
+    /**
+     * The nodes of a cache in cluster mode, from `BREWLESS_REDIS_NODES`.
+     *
+     * @return list<array{host: string, port: int}>
+     */
+    private static function redisNodes(): array
+    {
+        $nodes = [];
+
+        foreach (explode(',', (string) config('brewless.redis.nodes', '')) as $node) {
+            [$host, $port] = array_pad(explode(':', trim($node), 2), 2, '6379');
+
+            if ($host !== '' && ctype_digit($port)) {
+                $nodes[] = ['host' => $host, 'port' => (int) $port];
+            }
+        }
+
+        return $nodes;
     }
 
     /**

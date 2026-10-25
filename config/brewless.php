@@ -124,6 +124,8 @@ return [
     'redis' => [
         'ca' => env('BREWLESS_REDIS_CA'),
         'connections' => ['default', 'cache'],
+        // The nodes of a cache in cluster mode, comma-separated host:port; set by Brewless with `cache.nodes` in brewless.yml.
+        'nodes' => env('BREWLESS_REDIS_NODES'),
     ],
 
     /*

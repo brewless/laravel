@@ -143,6 +143,16 @@ with pauses of 1, 2, 4 and then 8 seconds, for up to `BREWLESS_DB_RETRY_SECONDS`
 with the connection. An application with a connection class of its own for a
 driver keeps it.
 
+### A cache in cluster mode
+
+With `cache: {name: …, nodes: 3}` in `brewless.yml` the cache is a cluster of
+three to six nodes, and Brewless sets `BREWLESS_REDIS_NODES` to every node
+(`host:port`, comma-separated). The package then makes the `default` and
+`cache` redis connections a phpredis cluster of those nodes, with the
+connection's own user and password and the cluster's certificate over TLS, so
+`Cache` and `Redis` work as before. A redis connection of your own is left as
+it is.
+
 ### A database per tenant
 
 An application that gives every customer of its own a database of its own
@@ -249,6 +259,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_PREVIEW_DOMAINS` | Comma-separated test domains (`brewless.dev`); empty turns the test address off |
 | `BREWLESS_HEARTBEAT_STORE` | Cache store for the sign of life (`file`) |
 | `BREWLESS_JOB_MAX_AGE` | Seconds a job signed for a queue trigger is good for (`3600`) |
+| `BREWLESS_REDIS_NODES` | The nodes of a cache in cluster mode, `host:port` comma-separated; the redis connections then become a cluster |
 | `BREWLESS_REDIS_CA` | The certificate of the cache's cluster, base64; the redis connections then speak TLS and trust only that certificate |
 | `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY`, `SQS_ENDPOINT` | The key and address of a queue at Scaleway Queues; handed to the `sqs` connection, which otherwise shares `AWS_*` with the `s3` disk |
 | `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT`, `BREWLESS_DATABASES_KEY` | Where and as which environment to ask Brewless for a database per tenant, and the key to sign with; set by Brewless with `databases` in `brewless.yml` |
