@@ -23,6 +23,13 @@ use Symfony\Component\HttpFoundation\Response;
  * nofollow`, and robots.txt disallows everything, whatever the application
  * serves there itself.
  *
+ * On the test address the session cookie is a `__Host-` cookie: Secure, for
+ * the whole path and for this exact name only. Every environment of every
+ * customer gets a test address under the same domain, and a browser never
+ * lets one of those set or overwrite a `__Host-` cookie of another, so an
+ * application on a neighbouring test address cannot put its own session on
+ * this one.
+ *
  * Only a name under one of the test domains counts. Scaleway sends a request
  * to a container only for names attached to it, so nobody reaches this
  * container with a test address Brewless did not give it.
@@ -42,6 +49,7 @@ final class PreviewHost
         }
 
         $request->attributes->set(self::ATTRIBUTE, true);
+        $session = $this->hostOnlySession();
 
         if ($request->isMethod('GET') && $request->getPathInfo() === '/robots.txt') {
             return $this->keepOut(new PlainResponse("User-agent: *\nDisallow: /\n", 200, ['Content-Type' => 'text/plain; charset=UTF-8']));
@@ -50,7 +58,11 @@ final class PreviewHost
         $own = parse_url((string) config('app.url'), PHP_URL_HOST);
 
         if (! is_string($own) || $own === '') {
-            return $this->keepOut($next($request));
+            try {
+                return $this->keepOut($next($request));
+            } finally {
+                $this->restoreSession($session);
+            }
         }
 
         $preview = $request->getScheme().'://'.strtolower(rtrim($request->getHost(), '.'));
@@ -69,6 +81,52 @@ final class PreviewHost
         } finally {
             // A process that serves more than one request must not carry it to the next.
             URL::forceRootUrl(null);
+            $this->restoreSession($session);
+        }
+    }
+
+    /**
+     * Make the session cookie a `__Host-` cookie for this request, and return
+     * the settings as they were, to put back after it.
+     *
+     * @return array<string, mixed>
+     */
+    private function hostOnlySession(): array
+    {
+        $before = [
+            'session.cookie' => config('session.cookie'),
+            'session.domain' => config('session.domain'),
+            'session.secure' => config('session.secure'),
+            'session.path' => config('session.path'),
+        ];
+        $name = is_string($before['session.cookie']) && $before['session.cookie'] !== '' ? $before['session.cookie'] : 'laravel_session';
+
+        $hostOnly = str_starts_with($name, '__Host-') ? $name : '__Host-'.$name;
+
+        config([
+            'session.cookie' => $hostOnly,
+            'session.domain' => null,
+            'session.secure' => true,
+            'session.path' => '/',
+        ]);
+
+        // A store made before this request keeps the name it was made with.
+        if (app()->resolved('session')) {
+            app('session')->driver()->setName($hostOnly);
+        }
+
+        return $before;
+    }
+
+    /**
+     * @param  array<string, mixed>  $before
+     */
+    private function restoreSession(array $before): void
+    {
+        config($before);
+
+        if (app()->resolved('session') && is_string($before['session.cookie']) && $before['session.cookie'] !== '') {
+            app('session')->driver()->setName($before['session.cookie']);
         }
     }
 

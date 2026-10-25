@@ -120,6 +120,13 @@ existing files before the application runs, so that file is served as it is.
 The pages still carry `noindex`, which is what keeps them out of search results. Your own domains are left alone. The request carries the
 attribute `brewless.preview` when it came in on the test address.
 
+On the test address the session cookie gets a `__Host-` prefix (and is
+Secure, for the whole path, without a domain). Every environment's test
+address sits under the same domain; a browser never lets one of them set or
+overwrite a `__Host-` cookie of another, so an application on a neighbouring
+test address cannot put a session of its own on yours. On your own domains the
+session cookie keeps its name and settings.
+
 ### A cache over TLS
 
 A cache at Scaleway (`cache` in `brewless.yml`) is a Managed Database for Redis on the Private Network of your project, reached over TLS with a certificate of its own cluster. Brewless gives the application that certificate as `BREWLESS_REDIS_CA` (base64), next to `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME` and `REDIS_PASSWORD`. With it, the package makes the `default` and `cache` redis connections speak TLS and trust that certificate and no other (`brewless.redis.connections` names them). The host is an address on the Private Network, which no certificate names, so the name is not checked; the certificate is. Without the variable your redis connections are left as you configured them.

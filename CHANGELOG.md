@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.13.0 (25 October 2026)
+
+- On the test address (a name under `brewless.dev`) the session cookie is a `__Host-` cookie: its name gets the prefix, and it is Secure, for path `/` and without a domain. All test addresses share one domain, and a browser never lets one of them set or overwrite a `__Host-` cookie of another. A visitor's session on the test address starts anew once after the update. Your own domains keep the session cookie as it was.
+
 ## 0.12.0 (24 October 2026)
 
 - A query whose database connection went away is tried again for up to `BREWLESS_DB_RETRY_SECONDS` (60), with pauses of 1, 2, 4 and then 8 seconds, instead of once at once. A managed database that restarts for maintenance (Scaleway's Serverless SQL Database: at most a minute, by default on Tuesdays 14:30–14:45 CEST) no longer fails the requests and jobs of that minute. Never inside a transaction. PostgreSQL's own "terminating connection due to administrator command" and "the database system is starting up" count as a lost connection too. Applies to the `pgsql` and `mysql` drivers, unless the application set a connection class of its own.

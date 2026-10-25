@@ -66,3 +66,26 @@ test('the addresses the application writes stay on the test address, so its asse
     Route::get('/plain-link', fn (): string => url('/x'));
     $this->get('http://shop.example/plain-link')->assertSee('http://shop.example/x', false);
 });
+
+test('on the test address the session cookie is a __Host- cookie: secure, for the whole path, without a domain', function (): void {
+    config(['session.driver' => 'array', 'session.cookie' => 'shop_session', 'session.domain' => '.shop.example', 'session.secure' => false]);
+    Route::middleware('web')->get('/visit', function (): string {
+        session()->put('seen', true);
+
+        return 'ok';
+    });
+
+    $cookie = collect($this->get(PREVIEW_URL.'/visit')->assertOk()->headers->getCookies())->first(static fn ($cookie): bool => str_ends_with($cookie->getName(), 'shop_session'));
+
+    expect($cookie?->getName())->toBe('__Host-shop_session')
+        ->and($cookie?->isSecure())->toBeTrue()
+        ->and($cookie?->getPath())->toBe('/')
+        ->and($cookie?->getDomain())->toBeNull()
+        // Put back after the request: the own domain keeps its own cookie.
+        ->and(config('session.cookie'))->toBe('shop_session')
+        ->and(config('session.domain'))->toBe('.shop.example');
+
+    $own = collect($this->get('http://shop.example/visit')->assertOk()->headers->getCookies())->first(static fn ($cookie): bool => str_ends_with($cookie->getName(), 'shop_session'));
+
+    expect($own?->getName())->toBe('shop_session');
+});
