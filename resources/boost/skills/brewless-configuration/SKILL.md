@@ -49,6 +49,7 @@ Do not set these by hand; Brewless writes them on every deploy:
 - `RELEASE`
 - with a cache: `BREWLESS_REDIS_CA`, `REDIS_*`
 - with databases per tenant: `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT`, `BREWLESS_DATABASES_KEY`
+- with Transactional Email: `MAIL_MAILER=smtp`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`, `BREWLESS_MAIL_EVENTS_TOPIC`, `BREWLESS_MAIL_COPIES_*` (once; a value the user changed is kept)
 
 `APP_URL` stays as the user set it. After a domain is added, `brewless domain:add` offers to set `APP_URL` to it.
 
@@ -80,6 +81,7 @@ environments:
 - **Sizes.** Memory is 128 to 12288 MB and CPU 70 to 6000. Memory must be at least the CPU and at most 4 times it. Give one and the other follows Scaleway's pairing.
 - **Timeouts** are 10 to 3600 seconds.
 - Sizes and scale set in the file cannot be changed with `brewless scale` or in the console.
+- **Mail.** A production environment with a domain gets Scaleway Transactional Email at its next deploy, unless the variables already have a `MAIL_MAILER` (never replaced) or the file says `mail: false`. `mail` is `scaleway`, `lettermint`, `false`, or a map with `mailer`, `domain` and `keep_days` (days a copy of each mail is kept in the environment's own bucket, 0 to 30). Do not put `MAIL_MAILER` under `variables` next to `mail`: that is refused. The DNS records are written only after the user says yes (`brewless deploy --mail-records`); never pass that flag on their behalf. Bounces reach the app as `Brewless\Laravel\Mail\MailEvent`. See https://docs.brewless.eu/running/mail.
 - **Firewall.** With bunny.net in front, `firewall` puts bunny.net Shield on the pull zone: `rate_limit` is the requests one address may make in 10 seconds before it is blocked for a minute (Shield Basic, free), `bot_control` is `challenge`, `log` or `off`. Bot control takes Shield Advanced or higher, which costs money at bunny.net: ask the user before adding it, and never change the Shield plan yourself. `firewall: false` removes what Brewless set. See https://docs.brewless.eu/running/firewall.
 
 ## Server files

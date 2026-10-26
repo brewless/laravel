@@ -3,6 +3,12 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.15.0 (27 October 2026)
+
+- With `BREWLESS_MAIL_COPIES_*` (set by Brewless for an environment that sends through Scaleway Transactional Email), a copy of every mail sent, headers and content as it went out, goes to the environment's own bucket under the id Transactional Email queued it as. A failure is logged and never stops the mail. Without those variables, nothing changes.
+- With `BREWLESS_MAIL_EVENTS_TOPIC`, `POST /_ops/mail-events` takes what Transactional Email reports of a mail from that topic, only with Scaleway's SNS signature (version 1, a certificate from `messaging.s3.fr-par.scw.cloud`), confirms the subscription at Scaleway only, and fires `Brewless\Laravel\Mail\MailEvent` with `bounced()` and `complained()`. Without the variable the route does not exist.
+- Needs `illuminate/mail` and `illuminate/events`, which every Laravel application has.
+
 ## 0.14.0 (25 October 2026)
 
 - With `BREWLESS_REDIS_NODES` (the nodes of a cache in cluster mode, set by Brewless with `cache.nodes` in `brewless.yml`) the `default` and `cache` redis connections become a phpredis cluster of those nodes, with their own user and password and the cluster's certificate over TLS. Without it, nothing changes.
