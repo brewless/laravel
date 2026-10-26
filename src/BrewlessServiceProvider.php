@@ -11,13 +11,16 @@ use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
 use Brewless\Laravel\Http\Middleware\PreviewHost;
 use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
+use Brewless\Laravel\Mail\MailCopies;
 use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\Connection;
 use Illuminate\Http\Client\Factory;
+use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Queue\QueueManager;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -153,7 +156,7 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $defaults = require __DIR__.'/../config/brewless.php';
 
-        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases', 'database'] as $section) {
+        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases', 'database', 'mail'] as $section) {
             config(['brewless.'.$section => array_replace($defaults[$section], (array) config('brewless.'.$section))]);
         }
     }
@@ -176,6 +179,11 @@ final class BrewlessServiceProvider extends ServiceProvider
             $queues->extend('sqs', static fn (): SignedSqsConnector => new SignedSqsConnector);
             $queues->extend('database', fn (): SignedDatabaseConnector => new SignedDatabaseConnector($this->app['db']));
         });
+
+        // A copy of every mail sent, when the environment keeps them.
+        if (MailCopies::configured()) {
+            Event::listen(MessageSent::class, [MailCopies::class, 'keep']);
+        }
 
         // First of all middleware: the host decides a lot further down, so it is put back before anything reads it.
         // Prepended in reverse: the edge's hostname first, then the test address.

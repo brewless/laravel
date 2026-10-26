@@ -157,4 +157,24 @@ return [
     'database' => [
         'retry_seconds' => (int) env('BREWLESS_DB_RETRY_SECONDS', 60),
     ],
+
+    /*
+    | A copy of every mail the application sends (`mail.keep_days` in
+    | brewless.yml), for the Brewless console to show its headers and a
+    | preview: the provider keeps neither. The copy goes to a private bucket
+    | of the environment's own, which Object Storage empties after those
+    | days, under the id Scaleway Transactional Email queued the mail as.
+    | Brewless gives the container a key that may only put there. Storing a
+    | copy never stops a mail: when it fails, it is only logged.
+    */
+    'mail' => [
+        'copies' => [
+            'bucket' => env('BREWLESS_MAIL_COPIES_BUCKET'),
+            'endpoint' => env('BREWLESS_MAIL_COPIES_ENDPOINT'),
+            'region' => env('BREWLESS_MAIL_COPIES_REGION'),
+            'key' => env('BREWLESS_MAIL_COPIES_ACCESS_KEY_ID'),
+            'secret' => env('BREWLESS_MAIL_COPIES_SECRET_ACCESS_KEY'),
+            'timeout' => 10,
+        ],
+    ],
 ];
