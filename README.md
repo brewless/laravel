@@ -213,6 +213,24 @@ minutes off, a name it does not make; `->status` is the HTTP status),
 slow down (safe to ask again), and `DatabaseNotReady` when waiting ends in an
 error or takes too long.
 
+### Mail
+
+With Scaleway Transactional Email as the mailer (`mail` in `brewless.yml`, the default of a production environment with a domain), the package does two things, each only when Brewless gave the container its variables:
+
+- **A copy of every mail sent**, headers and content as it went out, goes to a private bucket of the environment (`BREWLESS_MAIL_COPIES_*`), under the id Transactional Email queued it as, for the Brewless console to show. Object Storage removes it after `mail.keep_days`. Storing a copy never stops a mail: a failure is logged.
+- **`POST /_ops/mail-events`** takes what Transactional Email reports of a mail from the topic Brewless subscribed (`BREWLESS_MAIL_EVENTS_TOPIC`), only with Scaleway's signature, confirms the subscription, and fires `Brewless\Laravel\Mail\MailEvent`:
+
+```php
+use Brewless\Laravel\Mail\MailEvent;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(MailEvent::class, function (MailEvent $event): void {
+    if ($event->bounced() || $event->complained()) {
+        // $event->to, $event->type ('email_mailbox_not_found', 'email_spam', …), $event->error
+    }
+});
+```
+
 ## For coding agents
 
 The package teaches a coding agent (Claude Code, Codex, Cursor, Copilot, Junie and others) how an application on Brewless is deployed and run.

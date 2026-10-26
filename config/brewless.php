@@ -157,4 +157,37 @@ return [
     'database' => [
         'retry_seconds' => (int) env('BREWLESS_DB_RETRY_SECONDS', 60),
     ],
+
+    /*
+    | A copy of every mail the application sends (`mail.keep_days` in
+    | brewless.yml), for the Brewless console to show its headers and a
+    | preview: the provider keeps neither. The copy goes to a private bucket
+    | of the environment's own, which Object Storage empties after those
+    | days, under the id Scaleway Transactional Email queued the mail as.
+    | Brewless gives the container a key that may only put there. Storing a
+    | copy never stops a mail: when it fails, it is only logged.
+    */
+    'mail' => [
+        'copies' => [
+            'bucket' => env('BREWLESS_MAIL_COPIES_BUCKET'),
+            'endpoint' => env('BREWLESS_MAIL_COPIES_ENDPOINT'),
+            'region' => env('BREWLESS_MAIL_COPIES_REGION'),
+            'key' => env('BREWLESS_MAIL_COPIES_ACCESS_KEY_ID'),
+            'secret' => env('BREWLESS_MAIL_COPIES_SECRET_ACCESS_KEY'),
+            'timeout' => 10,
+        ],
+
+        /*
+        | What became of each mail sent through Transactional Email: Brewless
+        | subscribes the topic it reports to (Topics and Events, Scaleway's
+        | SNS) to POST /_ops/mail-events. A notification is believed only
+        | when Scaleway signed it, with a certificate from one of these hosts,
+        | and only from this topic; each becomes a Brewless\Laravel\Mail\MailEvent.
+        */
+        'events' => [
+            'topic' => env('BREWLESS_MAIL_EVENTS_TOPIC'),
+            'certificate_hosts' => ['messaging.s3.fr-par.scw.cloud'],
+            'subscribe_hosts' => ['sns.mnq.fr-par.scaleway.com'],
+        ],
+    ],
 ];

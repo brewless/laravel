@@ -7,17 +7,21 @@ namespace Brewless\Laravel;
 use Brewless\Laravel\Database\MySqlConnection;
 use Brewless\Laravel\Database\PostgresConnection;
 use Brewless\Laravel\Databases\DatabaseClient;
+use Brewless\Laravel\Http\Controllers\MailEventsController;
 use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
 use Brewless\Laravel\Http\Middleware\PreviewHost;
 use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
+use Brewless\Laravel\Mail\MailCopies;
 use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\Connection;
 use Illuminate\Http\Client\Factory;
+use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Queue\QueueManager;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -153,7 +157,7 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $defaults = require __DIR__.'/../config/brewless.php';
 
-        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases', 'database'] as $section) {
+        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases', 'database', 'mail'] as $section) {
             config(['brewless.'.$section => array_replace($defaults[$section], (array) config('brewless.'.$section))]);
         }
     }
@@ -177,11 +181,22 @@ final class BrewlessServiceProvider extends ServiceProvider
             $queues->extend('database', fn (): SignedDatabaseConnector => new SignedDatabaseConnector($this->app['db']));
         });
 
+        // A copy of every mail sent, when the environment keeps them.
+        if (MailCopies::configured()) {
+            Event::listen(MessageSent::class, [MailCopies::class, 'keep']);
+        }
+
         // First of all middleware: the host decides a lot further down, so it is put back before anything reads it.
         // Prepended in reverse: the edge's hostname first, then the test address.
         $kernel = $this->app->make(Kernel::class);
         $kernel->prependMiddleware(PreviewHost::class);
         $kernel->prependMiddleware(TrustEdgeHost::class);
+
+        // What became of each mail, from the provider's topic. Believed on its signature, not on a secret:
+        // the container that serves visitors, which this reaches, has none.
+        if (is_string(config('brewless.mail.events.topic')) && config('brewless.mail.events.topic') !== '') {
+            Route::post('/_ops/mail-events', MailEventsController::class)->name('brewless.ops.mail-events');
+        }
 
         // Machine traffic from a release and from the provider's triggers: no
         // session, no CSRF, no domain. Without the secret they do not exist.
