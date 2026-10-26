@@ -7,6 +7,7 @@ namespace Brewless\Laravel;
 use Brewless\Laravel\Database\MySqlConnection;
 use Brewless\Laravel\Database\PostgresConnection;
 use Brewless\Laravel\Databases\DatabaseClient;
+use Brewless\Laravel\Http\Controllers\MailEventsController;
 use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
 use Brewless\Laravel\Http\Middleware\PreviewHost;
@@ -190,6 +191,12 @@ final class BrewlessServiceProvider extends ServiceProvider
         $kernel = $this->app->make(Kernel::class);
         $kernel->prependMiddleware(PreviewHost::class);
         $kernel->prependMiddleware(TrustEdgeHost::class);
+
+        // What became of each mail, from the provider's topic. Believed on its signature, not on a secret:
+        // the container that serves visitors, which this reaches, has none.
+        if (is_string(config('brewless.mail.events.topic')) && config('brewless.mail.events.topic') !== '') {
+            Route::post('/_ops/mail-events', MailEventsController::class)->name('brewless.ops.mail-events');
+        }
 
         // Machine traffic from a release and from the provider's triggers: no
         // session, no CSRF, no domain. Without the secret they do not exist.

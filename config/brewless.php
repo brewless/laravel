@@ -176,5 +176,18 @@ return [
             'secret' => env('BREWLESS_MAIL_COPIES_SECRET_ACCESS_KEY'),
             'timeout' => 10,
         ],
+
+        /*
+        | What became of each mail sent through Transactional Email: Brewless
+        | subscribes the topic it reports to (Topics and Events, Scaleway's
+        | SNS) to POST /_ops/mail-events. A notification is believed only
+        | when Scaleway signed it, with a certificate from one of these hosts,
+        | and only from this topic; each becomes a Brewless\Laravel\Mail\MailEvent.
+        */
+        'events' => [
+            'topic' => env('BREWLESS_MAIL_EVENTS_TOPIC'),
+            'certificate_hosts' => ['messaging.s3.fr-par.scw.cloud'],
+            'subscribe_hosts' => ['sns.mnq.fr-par.scaleway.com'],
+        ],
     ],
 ];
