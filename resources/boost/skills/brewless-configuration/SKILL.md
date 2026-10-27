@@ -1,6 +1,6 @@
 ---
 name: brewless-configuration
-description: "Configures a Laravel application on Brewless: environment variables and secrets (brewless env:pull and env:push, Secret Manager), brewless.yml environments and container sizes, the PHP version, the BREWLESS_* variables of brewless/laravel, and the server files docker/Caddyfile, docker/php.ini and docker/entrypoint.sh. Use when the user wants to add or change an environment variable, APP_URL, a secret, brewless.yml settings, memory, CPU, timeouts, PHP settings, response headers or the FrankenPHP/Caddy configuration of a Brewless environment."
+description: "Configures a Laravel application on Brewless: environment variables and secrets (brewless env:pull and env:push, Secret Manager), brewless.yml environments and container sizes, the PHP version, the BREWLESS_* variables of brewless/laravel, and the server files docker/Caddyfile, docker/php.ini and docker/entrypoint.sh. Use when the user wants to add or change an environment variable, APP_URL, a secret, brewless.yml settings, memory, CPU, timeouts, PHP settings, response headers, Cache-Control and the edge cache, or the FrankenPHP/Caddy configuration of a Brewless environment."
 license: MIT
 metadata:
   author: brewless
@@ -83,6 +83,14 @@ environments:
 - Sizes and scale set in the file cannot be changed with `brewless scale` or in the console.
 - **Mail.** A production environment with a domain gets Scaleway Transactional Email at its next deploy, unless the variables already have a `MAIL_MAILER` (never replaced) or the file says `mail: false`. `mail` is `scaleway`, `lettermint`, `false`, or a map with `mailer`, `domain` and `keep_days` (days a copy of each mail is kept in the environment's own bucket, 0 to 30). Do not put `MAIL_MAILER` under `variables` next to `mail`: that is refused. The DNS records are written only after the user says yes (`brewless deploy --mail-records`); never pass that flag on their behalf. Bounces reach the app as `Brewless\Laravel\Mail\MailEvent`. See https://docs.brewless.eu/running/mail.
 - **Firewall.** With bunny.net in front, `firewall` puts bunny.net Shield on the pull zone: `rate_limit` is the requests one address may make in 10 seconds before it is blocked for a minute (Shield Basic, free), `bot_control` is `challenge`, `log` or `off`. Bot control takes Shield Advanced or higher, which costs money at bunny.net: ask the user before adding it, and never change the Shield plan yourself. `firewall: false` removes what Brewless set. See https://docs.brewless.eu/running/firewall.
+
+## The edge cache
+
+The web container sleeps after 15 idle minutes; every request that reaches it starts the count again. `brewless/laravel` (`Http\Middleware\CacheAtEdge`) therefore gives an answer `Cache-Control: public, max-age=0, s-maxage=<BREWLESS_EDGE_CACHE>` (300 seconds, `0` turns it off) when it cannot depend on who asked: a GET or HEAD without cookies and without `Authorization`, not for `/_ops/*`, answered with a 200, 301, 308, 404 or 410, without a cookie, without a started session, without a `Cache-Control` the application set and without a `Vary` other than `Accept-Encoding`. bunny.net then answers the next request for that address itself. Every release empties the edge, and `max-age=0` keeps the page out of browsers.
+
+- **A public page in the `web` group is never kept**: the session sets a cookie on every answer. When a page has no form and shows nothing of the signed-in user, take the session off its route: `->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, ValidateCsrfToken::class])` (in Laravel 13 the CSRF middleware is `PreventRequestForgery`). A page with a form keeps them.
+- **Keep a page out** by setting `Cache-Control` yourself: `->middleware('cache.headers:private')`, or `no-store`. Do that when the answer depends on what the edge does not see: the visitor's address, a header of your own, or `Accept` (the edge keeps one answer per address and ignores `Vary`).
+- **Check it** after a deploy with `curl -sI https://<domain>/<page>` twice: `cdn-cache: HIT` on the second answer. See https://docs.brewless.eu/running/edge-cache.
 
 ## Server files
 

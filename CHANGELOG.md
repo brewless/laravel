@@ -3,6 +3,12 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.17.0 (28 October 2026)
+
+- An answer that cannot depend on who asked gets `Cache-Control: public, max-age=0, s-maxage=300`, so bunny.net answers the next request for that address itself and the container can sleep (Scaleway lets it sleep after 15 idle minutes; behind an edge that kept nothing, crawlers alone kept a public site awake). Only a GET or HEAD without cookies and without `Authorization`, not for `/_ops/*`, answered with a 200, 301, 308, 404 or 410, without a cookie or a session, without a `Cache-Control` the application set itself, and without a `Vary` other than `Accept-Encoding`. `BREWLESS_EDGE_CACHE` sets the seconds; `0` turns it off. Brewless empties the edge on every release.
+- **Upgrading:** a route in the `web` group sets a session cookie and is not affected. A route without a session that answers differently on something the edge cannot see (the visitor's address, a header of your own, `Accept`) should set `Cache-Control` itself, for instance `->middleware('cache.headers:private')`.
+- The guideline for coding agents and the `brewless-configuration` skill describe the edge cache.
+
 ## 0.16.0 (27 October 2026)
 
 - The schedule runs in Europe/Amsterdam time: `->dailyAt('07:00')` means 07:00 in Amsterdam, in summer and in winter, unless the application sets `app.schedule_timezone` itself. `SCHEDULE_TIMEZONE` chooses another zone; `SCHEDULE_TIMEZONE=UTC` keeps the schedule as it was. Only the schedule changes: the zone the application stores and shows its times in stays its own.

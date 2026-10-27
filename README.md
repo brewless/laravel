@@ -109,6 +109,40 @@ edge, but there is the provider's own front end, which appends the address it
 saw as the last entry: only that entry is kept, so a visitor cannot choose
 their own address there either.
 
+### Pages the edge keeps
+
+A serverless container sleeps only after a quiet spell (15 minutes at
+Scaleway), and every request that reaches it starts the count again. Behind
+an edge that keeps nothing, every visitor and every crawler wakes it, so a
+public site hardly ever sleeps. So an answer that cannot depend on who asked
+gets `Cache-Control: public, max-age=0, s-maxage=300`, and the edge (bunny.net)
+answers the next request for that address itself. That is the case when:
+
+- the request is a GET or HEAD without cookies and without `Authorization`,
+  and not for `/_ops/*`;
+- the answer is a 200, 301, 308, 404 or 410, sets no cookie, and started no
+  session;
+- the application did not set `Cache-Control` itself;
+- it varies on nothing but `Accept-Encoding`.
+
+`max-age=0` keeps it out of the browser: Brewless empties the edge on every
+release, so after a deploy nobody gets a page of the release before.
+`BREWLESS_EDGE_CACHE` sets the seconds (`300`); `0` turns it off.
+
+A route in Laravel's `web` group starts a session and sets a cookie, so it is
+never kept. To let the edge keep a page that needs no session, take the
+session off its route:
+
+```php
+Route::get('/pricing', PricingController::class)
+    ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, ValidateCsrfToken::class]);
+```
+
+Keep a page out of the edge by setting `Cache-Control` yourself, for instance
+with `->middleware('cache.headers:private')` or `no-store`. Do that for a page
+that depends on something the edge cannot see: the visitor's address, a header
+of your own, or the `Accept` header (the edge keeps one answer per address).
+
 ### The test address
 
 Brewless gives every environment a test address, such as
@@ -256,6 +290,7 @@ The rules of the guideline:
 - Do not rely on the local disk.
 - No FrankenPHP worker mode or Octane.
 - Leave `/_ops/*` and `POST /` to the package.
+- Let public pages go without a session, so the edge can keep them; set `Cache-Control` yourself on a page the edge must not keep.
 
 Reading (`plan`, `releases`, `logs`, `env:pull`) an agent may do by itself.
 
@@ -277,6 +312,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_EDGE_SECRET` | The secret the edge adds to every request |
 | `BREWLESS_DOMAINS` | Comma-separated domains that are yours |
 | `BREWLESS_EDGE_HOPS` | Proxies between the visitor and the container (`1`) |
+| `BREWLESS_EDGE_CACHE` | Seconds the edge keeps an answer that is the same for everybody (`300`); `0` keeps nothing |
 | `BREWLESS_PREVIEW_DOMAINS` | Comma-separated test domains (`brewless.dev`); empty turns the test address off |
 | `BREWLESS_HEARTBEAT_STORE` | Cache store for the sign of life (`file`) |
 | `BREWLESS_JOB_MAX_AGE` | Seconds a job signed for a queue trigger is good for (`3600`) |

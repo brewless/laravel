@@ -92,6 +92,13 @@ return [
 
         // Domains that are yours. A hostname is believed when it is one of these or a subdomain of one.
         'domains' => array_values(array_filter(explode(',', (string) env('BREWLESS_DOMAINS', (string) parse_url((string) env('APP_URL', ''), PHP_URL_HOST))))),
+
+        // How many seconds the edge may keep an answer that is the same for
+        // everybody (Http\Middleware\CacheAtEdge): a GET without cookies or
+        // Authorization, answered without a cookie, a session or a
+        // Cache-Control of the application's own. Every release empties the
+        // edge. 0 caches nothing.
+        'cache' => (int) env('BREWLESS_EDGE_CACHE', 300),
     ],
 
     /*
