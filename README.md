@@ -10,7 +10,9 @@ anywhere.
 composer require brewless/laravel
 ```
 
-There is nothing to register. Laravel 12 and 13, PHP 8.3 and up.
+There is nothing to register. Laravel 12 and 13, PHP 8.3 and up. The AWS SDK
+(`aws/aws-sdk-php`) comes along: Laravel's `sqs` connection needs it, and a
+queue at Scaleway Queues is where Brewless puts the jobs of a new environment.
 
 ## What it adds
 

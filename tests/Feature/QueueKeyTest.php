@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Brewless\Laravel\BrewlessServiceProvider;
+use Brewless\Laravel\Queue\SignedSqsQueue;
 use Brewless\Laravel\Tests\TestCase;
 
 uses(TestCase::class);
@@ -35,4 +36,13 @@ test('without a key of its own the sqs connection is left as the application con
     (new BrewlessServiceProvider(app()))->register();
 
     expect(config('queue.connections.sqs'))->toBe(['driver' => 'sqs', 'key' => 'aws-key', 'secret' => 'aws-secret']);
+});
+
+test('the sqs connection can be built: the package brings the client it needs', function (): void {
+    config([
+        'queue.connections.sqs' => ['driver' => 'sqs', 'key' => 'queue-key', 'secret' => 'queue-secret', 'prefix' => 'https://sqs.mnq.fr-par.scaleway.com/project-1', 'queue' => 'shop', 'region' => 'fr-par'],
+    ]);
+
+    // Without the AWS SDK this failed only at the first job the queue trigger delivered (seen on Brewless itself, 27 October 2026).
+    expect(app('queue')->connection('sqs'))->toBeInstanceOf(SignedSqsQueue::class);
 });
