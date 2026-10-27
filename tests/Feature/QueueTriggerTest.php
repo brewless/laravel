@@ -313,7 +313,8 @@ test('the status names the moments of the schedule, so the scheduler is only cal
     $moments = $this->getJson('/_ops/status', $this->ops())->assertOk()->json('schedule');
 
     expect(collect($moments)->pluck('expression')->all())->toContain('*/15 * * * *', '10 2 * * *')
-        ->and(collect($moments)->pluck('timezone')->unique()->all())->toBe(['UTC']);
+        // The schedule runs in Amsterdam time unless the application chose a zone (0.16).
+        ->and(collect($moments)->pluck('timezone')->unique()->all())->toBe(['Europe/Amsterdam']);
 });
 
 test('a container without the ops secret, such as the one that serves visitors, signs its jobs too', function (): void {

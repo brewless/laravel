@@ -7,6 +7,17 @@ return [
     'release' => env('RELEASE'),
 
     /*
+    | The time zone of the schedule.
+    |
+    | Brewless is made for Europe: `->dailyAt('07:00')` means 07:00 in
+    | Amsterdam, summer and winter, unless the application sets
+    | `app.schedule_timezone` itself or SCHEDULE_TIMEZONE says otherwise
+    | (`SCHEDULE_TIMEZONE=UTC` keeps the schedule in UTC). Only the schedule:
+    | the time zone the application stores and shows times in stays its own.
+    */
+    'schedule_timezone' => env('SCHEDULE_TIMEZONE', 'Europe/Amsterdam'),
+
+    /*
     | Release operations over HTTP.
     |
     | Nothing stays running on a serverless container, and a one-off job

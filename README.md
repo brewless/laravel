@@ -273,6 +273,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | Variable | Meaning |
 | --- | --- |
 | `BREWLESS_OPS_SECRET` | Turns the ops routes on, on this container |
+| `SCHEDULE_TIMEZONE` | The time zone of the schedule (`Europe/Amsterdam`), unless the application sets `app.schedule_timezone` itself |
 | `BREWLESS_EDGE_SECRET` | The secret the edge adds to every request |
 | `BREWLESS_DOMAINS` | Comma-separated domains that are yours |
 | `BREWLESS_EDGE_HOPS` | Proxies between the visitor and the container (`1`) |

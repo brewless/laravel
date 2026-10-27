@@ -32,6 +32,11 @@ final class BrewlessServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../config/brewless.php', 'brewless');
         $this->fillInDefaults();
 
+        // The schedule runs in Amsterdam time unless the application chose a zone for it itself.
+        if (config('app.schedule_timezone') === null && is_string(config('brewless.schedule_timezone')) && config('brewless.schedule_timezone') !== '') {
+            config(['app.schedule_timezone' => config('brewless.schedule_timezone')]);
+        }
+
         // Before anything asks for the queue: the sqs connection gets the queue's own key.
         if (is_string(config('brewless.queue.key')) && config('brewless.queue.key') !== '') {
             config(['queue.connections.sqs' => array_filter((array) config('brewless.queue'), is_string(...)) + (array) config('queue.connections.sqs', [])]);

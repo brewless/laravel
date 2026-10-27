@@ -3,6 +3,11 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.16.0 (27 October 2026)
+
+- The schedule runs in Europe/Amsterdam time: `->dailyAt('07:00')` means 07:00 in Amsterdam, in summer and in winter, unless the application sets `app.schedule_timezone` itself. `SCHEDULE_TIMEZONE` chooses another zone; `SCHEDULE_TIMEZONE=UTC` keeps the schedule as it was. Only the schedule changes: the zone the application stores and shows its times in stays its own.
+- **Upgrading:** an application that left `app.schedule_timezone` unset and ran in UTC has its scheduled tasks move one hour earlier in winter and two in summer (a task at 03:00 now runs at 03:00 Amsterdam time, 02:00 or 01:00 UTC). Set `SCHEDULE_TIMEZONE=UTC` to keep the old times. Brewless calls the scheduler at those moments from version 2026-10-27 on (a task in Amsterdam time gets a cron at its UTC hour for winter and for summer).
+
 ## 0.15.1 (27 October 2026)
 
 - Requires `aws/aws-sdk-php`. The `sqs` connection builds an `Aws\Sqs\SqsClient`, and the package did not say it needs one: an application without the SDK of its own (through `league/flysystem-aws-s3-v3`, for instance) only found out at the first job, which then failed with `Class "Aws\Sqs\SqsClient" not found`, every job, until the SDK was installed. Seen on Brewless itself when it moved to Scaleway Queues.
