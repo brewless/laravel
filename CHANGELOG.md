@@ -3,7 +3,7 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
-## 0.15.1 (unreleased)
+## 0.15.1 (27 October 2026)
 
 - Requires `aws/aws-sdk-php`. The `sqs` connection builds an `Aws\Sqs\SqsClient`, and the package did not say it needs one: an application without the SDK of its own (through `league/flysystem-aws-s3-v3`, for instance) only found out at the first job, which then failed with `Class "Aws\Sqs\SqsClient" not found`, every job, until the SDK was installed. Seen on Brewless itself when it moved to Scaleway Queues.
 
