@@ -123,7 +123,10 @@ answers the next request for that address itself. That is the case when:
 - the answer is a 200, 301, 308, 404 or 410, sets no cookie, and started no
   session;
 - the application did not set `Cache-Control` itself;
-- it varies on nothing but `Accept-Encoding`.
+- it varies on nothing but `Accept-Encoding`;
+- the page did not ask who is signed in (`@auth`, `auth()->user()`): the edge
+  keeps one answer per address, whatever cookies come along, and would give a
+  guest's page to a signed-in visitor.
 
 `max-age=0` keeps it out of the browser: Brewless empties the edge on every
 release, so after a deploy nobody gets a page of the release before. A pull

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Brewless\Laravel\Tests\TestCase;
+use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Facades\Route;
 
 uses(TestCase::class);
@@ -74,4 +75,12 @@ test('the seconds are the edge cache setting, and 0 keeps nothing', function ():
 
     config(['brewless.edge.cache' => 0]);
     $this->get('/page')->assertHeader('Cache-Control', 'no-cache, private');
+});
+
+test('a page that asked who is signed in is never kept: the edge would give it to a signed-in visitor too', function (): void {
+    config(['auth.defaults.guard' => 'web', 'auth.guards.web' => ['driver' => 'session', 'provider' => 'users'], 'auth.providers.users' => ['driver' => 'eloquent', 'model' => User::class]]);
+    Route::get('/greeting', fn (): string => auth()->check() ? 'welcome back' : 'hello');
+    app()->forgetInstance('auth');
+
+    expect($this->get('/greeting')->assertOk()->headers->get('Cache-Control'))->not->toContain('public');
 });

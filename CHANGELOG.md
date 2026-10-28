@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.18.1 (28 October 2026)
+
+- A page that asked an auth guard who is signed in (`@auth`, `auth()->user()`, the `auth` middleware) is never kept at the edge. The edge keeps one answer per address whatever cookies come along, so it would give a guest's page to a signed-in visitor, who would look signed out on it. Since 0.18 a guest's page on Laravel 13 can have no session, so such a page could otherwise be kept.
+
 ## 0.18.0 (28 October 2026)
 
 - A guest without any cookie gets no session on a page that does not need one (`Http\Middleware\StartSessionWhenNeeded`, bound in place of Laravel's `StartSession`). A GET or HEAD without a cookie and without `Authorization`, whose page put nothing in the session but Laravel's own token, previous URL and empty flash bag, and whose answer does not carry the CSRF token, gets no session cookie and no `XSRF-TOKEN`, and the session is not stored. The edge may then keep the page. Such a request does not read the session store either, and garbage is collected only when a session is kept, so sessions in a database no longer wake it for a guest. Only an HTML page: an empty answer or JSON (Sanctum's `/sanctum/csrf-cookie`) keeps its cookies. A form, a page that puts something in the session, a streamed answer and every visitor with a cookie keep their session as before. On by itself on Laravel 13 only, whose CSRF check lets a same-origin request through without a token: a page whose script posts later on the `XSRF-TOKEN` cookie (Inertia, a Vue sign-in screen) would get a 419 on Laravel 12. `BREWLESS_STATELESS_GUESTS=true` turns it on there too, `false` turns it off.

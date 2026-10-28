@@ -25,7 +25,9 @@ use Symfony\Component\HttpFoundation\Response;
  * - the application did not set `Cache-Control` itself: whatever it chose,
  *   `no-store`, `private` or a time of its own, stays as it is;
  * - it varies on nothing but `Accept-Encoding`, the only `Vary` an edge keeps
- *   apart.
+ *   apart;
+ * - the page did not ask who is signed in (an auth guard was not used): the
+ *   edge would give a guest's page to a signed-in visitor too.
  *
  * `max-age=0` keeps it out of the browser's own cache. Brewless empties the
  * edge on every release, and it cannot empty a browser: so after a deploy no
@@ -49,14 +51,25 @@ final class CacheAtEdge
      */
     public function handle(Request $request, Closure $next): Response
     {
+        $lookedBefore = $this->lookedAtTheUser();
         $response = $next($request);
         $seconds = (int) config('brewless.edge.cache', 0);
 
-        if ($seconds > 0 && $this->anonymous($request) && $this->sameForEverybody($request, $response)) {
+        // A page that asked who is signed in (@auth, auth()->user(), the auth middleware) answers a signed-in
+        // visitor differently, and the edge keeps one answer per address whatever cookies come along.
+        $personal = ! $lookedBefore && $this->lookedAtTheUser();
+
+        if ($seconds > 0 && ! $personal && $this->anonymous($request) && $this->sameForEverybody($request, $response)) {
             $response->headers->set('Cache-Control', 'public, max-age=0, s-maxage='.$seconds);
         }
 
         return $response;
+    }
+
+    /** Whether the application asked an auth guard for the visitor during this request. */
+    private function lookedAtTheUser(): bool
+    {
+        return app()->resolved('auth') && app('auth')->hasResolvedGuards();
     }
 
     /** Nothing in the request says who is asking. */
