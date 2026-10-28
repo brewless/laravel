@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.18.2 (28 October 2026)
+
+- The guidelines say to version a file in `public/` by its content, never by `filemtime()`: every file in a Brewless image carries the time of the commit, so a time-based `?v=` gives every file a new address on every deploy, and crawlers and open tabs then wake the container for the old addresses.
+
 ## 0.18.1 (28 October 2026)
 
 - A page that asked an auth guard who is signed in (`@auth`, `auth()->user()`, the `auth` middleware) is never kept at the edge. The edge keeps one answer per address whatever cookies come along, so it would give a guest's page to a signed-in visitor, who would look signed out on it. Since 0.18 a guest's page on Laravel 13 can have no session, so such a page could otherwise be kept.
