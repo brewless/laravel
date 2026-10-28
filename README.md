@@ -126,7 +126,10 @@ answers the next request for that address itself. That is the case when:
 - it varies on nothing but `Accept-Encoding`.
 
 `max-age=0` keeps it out of the browser: Brewless empties the edge on every
-release, so after a deploy nobody gets a page of the release before.
+release, so after a deploy nobody gets a page of the release before. A pull
+zone Brewless manages keeps a page per hostname, so a subdomain never gets the
+page of the domain. An edge of your own must do the same (at bunny.net: vary
+the cache by hostname), or turn this off.
 `BREWLESS_EDGE_CACHE` sets the seconds (`300`); `0` turns it off.
 
 A route in Laravel's `web` group starts a session and sets a cookie, so it is

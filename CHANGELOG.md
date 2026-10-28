@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.17.1 (28 October 2026)
+
+- The README, the agent guideline and the `brewless-configuration` skill say that the edge must keep a page per hostname. One pull zone answers for a domain and every subdomain; bunny.net keeps a page per path unless it is told otherwise, and then the page of `example.com/` is what `shop.example.com/` gets. Brewless turns that on for every pull zone it manages from its release of 28 October 2026; an edge of your own needs it too, or `BREWLESS_EDGE_CACHE=0`.
+
 ## 0.17.0 (28 October 2026)
 
 - An answer that cannot depend on who asked gets `Cache-Control: public, max-age=0, s-maxage=300`, so bunny.net answers the next request for that address itself and the container can sleep (Scaleway lets it sleep after 15 idle minutes; behind an edge that kept nothing, crawlers alone kept a public site awake). Only a GET or HEAD without cookies and without `Authorization`, not for `/_ops/*`, answered with a 200, 301, 308, 404 or 410, without a cookie or a session, without a `Cache-Control` the application set itself, and without a `Vary` other than `Accept-Encoding`. `BREWLESS_EDGE_CACHE` sets the seconds; `0` turns it off. Brewless empties the edge on every release.

@@ -32,6 +32,10 @@ use Symfony\Component\HttpFoundation\Response;
  * visitor sees a page of the release before, and between deploys a page is at
  * most `s-maxage` seconds old.
  *
+ * The edge must keep a page per hostname: one pull zone answers for a
+ * domain and every subdomain. Brewless sets that on every pull zone it
+ * manages.
+ *
  * `brewless.edge.cache` holds the seconds (`BREWLESS_EDGE_CACHE`, 300);
  * 0 turns it off.
  */
