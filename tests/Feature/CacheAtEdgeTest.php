@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Route;
 
 uses(TestCase::class);
 
-const EDGE_CACHE = 'max-age=0, public, s-maxage=300';
+const EDGE_CACHE = 'max-age=0, public, s-maxage=3600';
 
 beforeEach(function (): void {
     config(['session.driver' => 'array']);
@@ -23,7 +23,12 @@ beforeEach(function (): void {
     Route::get('/cookie', fn () => response('crumbs')->cookie('flavour', 'oat'));
     Route::get('/negotiated', fn () => response('either')->header('Vary', 'Accept'));
     Route::get('/compressed', fn () => response('either')->header('Vary', 'Accept-Encoding'));
-    Route::middleware('web')->get('/session', fn (): string => 'with a session');
+    // A page that put something in its session keeps it (a page that did not loses it, see StatelessGuestsTest).
+    Route::middleware('web')->get('/session', function (): string {
+        session()->put('seen', true);
+
+        return 'with a session';
+    });
     Route::post('/form', fn (): string => 'posted');
 });
 

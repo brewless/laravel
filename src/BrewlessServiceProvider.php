@@ -12,19 +12,27 @@ use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Middleware\CacheAtEdge;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
 use Brewless\Laravel\Http\Middleware\PreviewHost;
+use Brewless\Laravel\Http\Middleware\StartSessionWhenNeeded;
 use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
 use Brewless\Laravel\Mail\MailCopies;
 use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
+use Closure;
+use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\Connection;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Queue\QueueManager;
+use Illuminate\Routing\Route as RoutingRoute;
+use Illuminate\Routing\Router;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Session\SessionManager;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 final class BrewlessServiceProvider extends ServiceProvider
 {
@@ -45,6 +53,14 @@ final class BrewlessServiceProvider extends ServiceProvider
 
         $this->trustRedisCertificate();
         $this->retryLostConnections();
+
+        // Laravel's StartSession, which leaves out the session of a guest whose page does not need one (see
+        // StartSessionWhenNeeded). Bound over the framework's own binding, so the `web` group, withoutMiddleware()
+        // and everything else that names StartSession keep working as they did.
+        $this->app->singleton(StartSession::class, static fn (Application $app): StartSession => new StartSessionWhenNeeded(
+            $app->make(SessionManager::class),
+            static fn (): CacheFactory => $app->make(CacheFactory::class),
+        ));
 
         // Read when it is asked for, so a test or a command can set the settings first.
         $this->app->bind(DatabaseClient::class, static fn (Application $app): DatabaseClient => new DatabaseClient(
@@ -135,6 +151,22 @@ final class BrewlessServiceProvider extends ServiceProvider
     }
 
     /**
+     * The middleware a page without a session goes without: the session, the errors it carries, and the
+     * CSRF check, by the name it has in Laravel 13 (PreventRequestForgery) and 12 (ValidateCsrfToken).
+     *
+     * @return list<class-string>
+     */
+    public static function sessionMiddleware(): array
+    {
+        return array_values(array_filter([
+            StartSession::class,
+            ShareErrorsFromSession::class,
+            'Illuminate\\Foundation\\Http\\Middleware\\PreventRequestForgery',
+            'Illuminate\\Foundation\\Http\\Middleware\\ValidateCsrfToken',
+        ], class_exists(...)));
+    }
+
+    /**
      * PostgreSQL and MySQL connections try a query again for a while after
      * their connection went away (see RetriesLostConnections). An application
      * that made a connection class of its own for a driver keeps it.
@@ -200,6 +232,17 @@ final class BrewlessServiceProvider extends ServiceProvider
         $kernel->prependMiddleware(CacheAtEdge::class);
         $kernel->prependMiddleware(PreviewHost::class);
         $kernel->prependMiddleware(TrustEdgeHost::class);
+
+        // Routes that go without a session: Route::withoutSession(fn () => ...) around a group, or
+        // ->withoutSession() on one route. The edge may keep what they answer.
+        Router::macro('withoutSession', function (Closure|array|string $routes): void {
+            /** @var Router $this */
+            $this->withoutMiddleware(BrewlessServiceProvider::sessionMiddleware())->group($routes);
+        });
+        RoutingRoute::macro('withoutSession', function (): RoutingRoute {
+            /** @var RoutingRoute $this */
+            return $this->withoutMiddleware(BrewlessServiceProvider::sessionMiddleware());
+        });
 
         // What became of each mail, from the provider's topic. Believed on its signature, not on a secret:
         // the container that serves visitors, which this reaches, has none.

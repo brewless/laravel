@@ -36,7 +36,7 @@ use Symfony\Component\HttpFoundation\Response;
  * domain and every subdomain. Brewless sets that on every pull zone it
  * manages.
  *
- * `brewless.edge.cache` holds the seconds (`BREWLESS_EDGE_CACHE`, 300);
+ * `brewless.edge.cache` holds the seconds (`BREWLESS_EDGE_CACHE`, 3600);
  * 0 turns it off.
  */
 final class CacheAtEdge
@@ -76,7 +76,8 @@ final class CacheAtEdge
             return false;
         }
 
-        if ($request->hasSession() && $request->session()->isStarted()) {
+        // A session StartSessionWhenNeeded left unstored on purpose sets no cookie and is not this visitor's.
+        if ($request->hasSession() && $request->session()->isStarted() && $request->attributes->get(StartSessionWhenNeeded::SKIPPED) !== true) {
             return false;
         }
 

@@ -3,6 +3,16 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.18.0 (28 October 2026)
+
+- A guest without any cookie gets no session on a page that does not need one (`Http\Middleware\StartSessionWhenNeeded`, bound in place of Laravel's `StartSession`). A GET or HEAD without a cookie and without `Authorization`, whose page put nothing in the session but Laravel's own token, previous URL and empty flash bag, and whose answer does not carry the CSRF token, gets no session cookie and no `XSRF-TOKEN`, and the session is not stored. The edge may then keep the page. Such a request does not read the session store either, and garbage is collected only when a session is kept, so sessions in a database no longer wake it for a guest. Only an HTML page: an empty answer or JSON (Sanctum's `/sanctum/csrf-cookie`) keeps its cookies. A form, a page that puts something in the session, a streamed answer and every visitor with a cookie keep their session as before. On by itself on Laravel 13 only, whose CSRF check lets a same-origin request through without a token: a page whose script posts later on the `XSRF-TOKEN` cookie (Inertia, a Vue sign-in screen) would get a 419 on Laravel 12. `BREWLESS_STATELESS_GUESTS=true` turns it on there too, `false` turns it off.
+- `Route::withoutSession(fn () => ...)` around a group and `->withoutSession()` on one route take `StartSession`, `ShareErrorsFromSession` and the CSRF middleware (`PreventRequestForgery` or `ValidateCsrfToken`) off those routes, for every visitor.
+- The edge keeps a page an hour by default: `BREWLESS_EDGE_CACHE` goes from 300 to 3600. Every release empties the edge.
+- **Upgrading:**
+  - A guest without a cookie no longer gets a session cookie or `XSRF-TOKEN` on a page without a form, and that page is kept at the edge for an hour. A page that reads something per visitor without putting it in the session (a cookie of your own, the visitor's address) should set `Cache-Control: private` itself. Set `BREWLESS_STATELESS_GUESTS=false` for Laravel's behaviour. A browser that sends no `Sec-Fetch-Site` (Safari before 16.4) posts a form without a token only with the token: a page whose form posts by script without one gets a 419 there.
+  - A page that only puts the CSRF token in a meta tag or JavaScript keeps its session: the token is in the answer. Use `Route::withoutSession()` when it does not need one.
+  - Set `BREWLESS_EDGE_CACHE=300` to keep the old five minutes.
+
 ## 0.17.1 (28 October 2026)
 
 - The README, the agent guideline and the `brewless-configuration` skill say that the edge must keep a page per hostname. One pull zone answers for a domain and every subdomain; bunny.net keeps a page per path unless it is told otherwise, and then the page of `example.com/` is what `shop.example.com/` gets. Brewless turns that on for every pull zone it manages from its release of 28 October 2026; an edge of your own needs it too, or `BREWLESS_EDGE_CACHE=0`.

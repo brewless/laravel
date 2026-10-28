@@ -115,7 +115,7 @@ A serverless container sleeps only after a quiet spell (15 minutes at
 Scaleway), and every request that reaches it starts the count again. Behind
 an edge that keeps nothing, every visitor and every crawler wakes it, so a
 public site hardly ever sleeps. So an answer that cannot depend on who asked
-gets `Cache-Control: public, max-age=0, s-maxage=300`, and the edge (bunny.net)
+gets `Cache-Control: public, max-age=0, s-maxage=3600`, and the edge (bunny.net)
 answers the next request for that address itself. That is the case when:
 
 - the request is a GET or HEAD without cookies and without `Authorization`,
@@ -130,16 +130,51 @@ release, so after a deploy nobody gets a page of the release before. A pull
 zone Brewless manages keeps a page per hostname, so a subdomain never gets the
 page of the domain. An edge of your own must do the same (at bunny.net: vary
 the cache by hostname), or turn this off.
-`BREWLESS_EDGE_CACHE` sets the seconds (`300`); `0` turns it off.
+`BREWLESS_EDGE_CACHE` sets the seconds (`3600`); `0` turns it off.
 
-A route in Laravel's `web` group starts a session and sets a cookie, so it is
-never kept. To let the edge keep a page that needs no session, take the
-session off its route:
+A route in Laravel's `web` group starts a session, stores it and sets its
+cookie and `XSRF-TOKEN`, and an answer with a cookie is never kept. So the
+package leaves the session out for a guest who does not need one: a GET or
+HEAD without any cookie and without `Authorization` gets no session cookie
+and no `XSRF-TOKEN`, and nothing is read or stored, when
+
+- the page put nothing in the session but what Laravel puts there itself (the
+  CSRF token, the previous URL, an empty flash bag), and
+- the answer does not carry the CSRF token: there is no form to post.
+
+A page with a form, a page that puts something in the session (a flash
+message, an intended URL), a streamed answer and every visitor who sent a
+cookie keep their session exactly as before. With sessions in a database, a
+guest on a public page does not touch it either: the session of a request
+without a session cookie is started without a read, and garbage is collected
+only when a session is kept. Only an HTML page counts: an empty answer or JSON
+(Sanctum's `/sanctum/csrf-cookie`) is asked for to get those cookies.
+
+A page whose script posts later without the token in its HTML (Inertia, the
+sign-in screen of a Vue app) relies on the `XSRF-TOKEN` cookie. Laravel 13's
+CSRF check lets a same-origin request through without a token, Laravel 12's
+does not. So this is on by itself on Laravel 13 only.
+`BREWLESS_STATELESS_GUESTS=true` turns it on on Laravel 12 too,
+`BREWLESS_STATELESS_GUESTS=false` turns it off.
+
+To say it outright, or for a page that shows the CSRF token but needs no
+session, take the session off a group or a route:
 
 ```php
-Route::get('/pricing', PricingController::class)
-    ->withoutMiddleware([StartSession::class, ShareErrorsFromSession::class, ValidateCsrfToken::class]);
+use Illuminate\Support\Facades\Route;
+
+Route::withoutSession(function () {
+    Route::view('/', 'home');
+    Route::get('/blog/{post}', [BlogController::class, 'show']);
+});
+
+Route::get('/pricing', PricingController::class)->withoutSession();
 ```
+
+That takes `StartSession`, `ShareErrorsFromSession` and the CSRF middleware
+(`PreventRequestForgery` on Laravel 13, `ValidateCsrfToken` on 12) off those
+routes, for every visitor, signed in or not. Inside an existing group, such
+as the `web` group of `routes/web.php`, put it inside that group.
 
 Keep a page out of the edge by setting `Cache-Control` yourself, for instance
 with `->middleware('cache.headers:private')` or `no-store`. Do that for a page
@@ -293,7 +328,7 @@ The rules of the guideline:
 - Do not rely on the local disk.
 - No FrankenPHP worker mode or Octane.
 - Leave `/_ops/*` and `POST /` to the package.
-- Let public pages go without a session, so the edge can keep them; set `Cache-Control` yourself on a page the edge must not keep.
+- Let public pages go without a session (the package leaves it out for a guest whose page does not need one, or `Route::withoutSession()`), so the edge can keep them; set `Cache-Control` yourself on a page the edge must not keep.
 
 Reading (`plan`, `releases`, `logs`, `env:pull`) an agent may do by itself.
 
@@ -315,7 +350,8 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_EDGE_SECRET` | The secret the edge adds to every request |
 | `BREWLESS_DOMAINS` | Comma-separated domains that are yours |
 | `BREWLESS_EDGE_HOPS` | Proxies between the visitor and the container (`1`) |
-| `BREWLESS_EDGE_CACHE` | Seconds the edge keeps an answer that is the same for everybody (`300`); `0` keeps nothing |
+| `BREWLESS_EDGE_CACHE` | Seconds the edge keeps an answer that is the same for everybody (`3600`); `0` keeps nothing |
+| `BREWLESS_STATELESS_GUESTS` | Leave the session out for a guest without a cookie whose HTML page does not need one; unset: on Laravel 13 only. `true` on Laravel 12 too, `false` keeps a session on every page of the `web` group |
 | `BREWLESS_PREVIEW_DOMAINS` | Comma-separated test domains (`brewless.dev`); empty turns the test address off |
 | `BREWLESS_HEARTBEAT_STORE` | Cache store for the sign of life (`file`) |
 | `BREWLESS_JOB_MAX_AGE` | Seconds a job signed for a queue trigger is good for (`3600`) |

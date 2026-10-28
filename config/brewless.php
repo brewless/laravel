@@ -98,7 +98,13 @@ return [
         // Authorization, answered without a cookie, a session or a
         // Cache-Control of the application's own. Every release empties the
         // edge. 0 caches nothing.
-        'cache' => (int) env('BREWLESS_EDGE_CACHE', 300),
+        'cache' => (int) env('BREWLESS_EDGE_CACHE', 3600),
+
+        // A guest without any cookie gets no session cookie and nothing is stored when an HTML page put
+        // nothing in the session and shows no CSRF token (Http\Middleware\StartSessionWhenNeeded), so the
+        // edge may keep that page. Unset: on where Laravel's CSRF check accepts a same-origin request without
+        // a token (Laravel 13). true turns it on on Laravel 12 too; false keeps a session on every page.
+        'stateless_guests' => env('BREWLESS_STATELESS_GUESTS'),
     ],
 
     /*
