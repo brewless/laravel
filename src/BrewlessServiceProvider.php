@@ -53,6 +53,7 @@ final class BrewlessServiceProvider extends ServiceProvider
 
         $this->trustRedisCertificate();
         $this->retryLostConnections();
+        $this->storesWithoutADatabase();
 
         // Laravel's StartSession, which leaves out the session of a guest whose page does not need one (see
         // StartSessionWhenNeeded). Bound over the framework's own binding, so the `web` group, withoutMiddleware()
@@ -191,6 +192,49 @@ final class BrewlessServiceProvider extends ServiceProvider
      * An application with a `config/brewless.php` of its own names only what
      * it changes: every setting it leaves out keeps the value from this package.
      */
+    /**
+     * The framework keeps the cache and the session in a database by default,
+     * and an environment need not have one: every page then fails on a
+     * connection that is not there. Where no database is configured the cache
+     * goes on the container's own disk and the session into the cookie, which
+     * the next container reads as well. An application that named a store of
+     * its own keeps it.
+     */
+    private function storesWithoutADatabase(): void
+    {
+        if ($this->databaseIsConfigured()) {
+            return;
+        }
+
+        if (config('cache.default') === 'database') {
+            config(['cache.default' => 'file']);
+        }
+
+        if (config('session.driver') === 'database') {
+            config(['session.driver' => 'cookie']);
+        }
+    }
+
+    /**
+     * Whether the default connection points at a database that is there: a
+     * server to reach, or a SQLite file that exists. The framework falls back
+     * to a SQLite file in the project, which a container does not carry.
+     */
+    private function databaseIsConfigured(): bool
+    {
+        $connection = (array) config('database.connections.'.config('database.default'), []);
+
+        if (($connection['driver'] ?? null) === 'sqlite') {
+            $database = $connection['database'] ?? null;
+
+            return $database === ':memory:' || (is_string($database) && is_file($database));
+        }
+
+        return ((string) ($connection['host'] ?? '')) !== ''
+            || ((string) ($connection['url'] ?? '')) !== ''
+            || ((string) ($connection['unix_socket'] ?? '')) !== '';
+    }
+
     private function fillInDefaults(): void
     {
         $defaults = require __DIR__.'/../config/brewless.php';
