@@ -20,7 +20,10 @@ use Throwable;
  * The same holds for a container that just started from zero: its private
  * network can take a few seconds to carry traffic, and until then connecting
  * fails with "No route to host" (seen on Scaleway Serverless Containers on
- * 29 October 2026, five seconds after a cold start).
+ * 29 October 2026, five seconds after a cold start). And a Serverless SQL
+ * Database that slept wakes up when it is connected to; until it is up,
+ * connecting ends in "timeout expired" (seen on 29 October 2026, when a
+ * release's migrations were the first to reach the databases that morning).
  * Here the query is tried again with pauses of 1, 2, 4 and then 8 seconds,
  * until it runs or `brewless.database.retry_seconds` have passed.
  *
@@ -47,6 +50,7 @@ trait RetriesLostConnections
         'failed: Network is unreachable',
         '[2002] No route to host',
         '[2002] Network is unreachable',
+        'failed: timeout expired',
     ];
 
     /**

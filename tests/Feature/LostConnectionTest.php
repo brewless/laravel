@@ -73,6 +73,13 @@ test('a private network that does not carry traffic yet after a cold start count
     'mysql' => 'SQLSTATE[HY000] [2002] No route to host',
 ]);
 
+test('a serverless database that is still waking up counts too', function (): void {
+    $connection = flakyConnection(2, $tries, "SQLSTATE[08006] [7] connection to server at \"314b0b36.pg.sdb.fr-par.scw.cloud\" (163.172.142.91), port 5432 failed: timeout expired\nconnection to server at \"314b0b36.pg.sdb.fr-par.scw.cloud\" (212.47.254.106), port 5432 failed: timeout expired");
+
+    expect($connection->select('select 1 as one'))->toHaveCount(1)
+        ->and($tries)->toBe(3);
+});
+
 test('after the seconds of brewless.database.retry_seconds it gives up with the error', function (): void {
     config(['brewless.database.retry_seconds' => 10]);
     $connection = flakyConnection(100, $tries);
