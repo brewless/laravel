@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.18.5 (29 October 2026)
+
+- The `brewless-databases` skill tells a coding agent that a Serverless SQL Database shares its sessions through a pooler, so a session setting of one client can reach another, and that `pg_dump` gets a database user of its own: it empties the `search_path` of its session, and an application query that lands there afterwards no longer finds its tables (`relation "cache_locks" does not exist` on PrivaSearch, three nights in a row).
+
 ## 0.18.4 (29 October 2026)
 
 - Connecting that ends in "timeout expired" is tried again for a while too. A Scaleway Serverless SQL Database that scaled to zero wakes up when it is connected to and can take longer than the connect timeout; a release whose migrations were the first to reach the databases in the morning failed on it, once on the central database and once on an organisation's.

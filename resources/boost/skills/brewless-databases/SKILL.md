@@ -59,6 +59,8 @@ brewless logs production --source=release
 - It holds one database. Environments that share it share its tables.
 - It uses `DB_SSLMODE`. Keep the connection's `sslmode` reading that variable.
 - Scaleway restarts it for maintenance, by default on Tuesdays between 14:30 and 14:45 CEST, disconnecting clients for at most a minute. `brewless/laravel` tries a query again for up to `BREWLESS_DB_RETRY_SECONDS` (60) after a lost connection, outside transactions. Keep transactions short, and do not schedule releases in that window.
+- Its sessions are shared: a connection pooler hands server sessions to whichever client asks, so a `SET` of one client (`search_path`, time zone) can reach another, and can be lost when the database scales. Never rely on a session setting.
+- `pg_dump` empties the `search_path` of its session. A query of the application that lands there afterwards fails with `relation "…" does not exist` on a table that is there. Give a dump its own database user: an IAM application with the permission set `ServerlessSQLDatabaseReadOnly` in the project of the database, its ID as user name and an API key's secret as password, pushed as two variables with `brewless env:push` and handed to `pg_dump` as `PGUSER` and `PGPASSWORD`. The application's own `DB_USERNAME`/`DB_PASSWORD` do not do: the dump then shares the application's sessions again.
 
 ## Queues
 
