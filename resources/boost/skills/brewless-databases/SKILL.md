@@ -72,6 +72,15 @@ brewless logs production --source=release
 
 A `cache` gives `CACHE_STORE=redis` and the `REDIS_*` variables, plus `BREWLESS_REDIS_CA`. With that certificate, `brewless/laravel` makes the `default` and `cache` redis connections use TLS and trust only that cluster. Keep `REDIS_CLIENT=phpredis`. A cache runs and is billed every hour; it does not sleep.
 
+## Moving data in
+
+- `brewless db:import <env> <postgres|mysql>://<user>@<host>[:<port>]/<database>` copies an existing database into the environment's own, in a job of the user's Scaleway project; the password comes from `SOURCE_DB_PASSWORD`, `--from-env=<old .env>` (its `DB_*` lines) or a prompt, never from the command line. It changes nothing at the source.
+- PostgreSQL copies into PostgreSQL in one transaction; MySQL into a Managed MySQL as it is, or into Serverless SQL converted by pgloader (tables, indexes, foreign keys and sequences; not views, triggers or routines). PostgreSQL into MySQL is refused.
+- It refuses a destination that holds tables. `--replace` removes them first: ask before using it, it replaces the environment's data. The first deploy runs the migrations, so copy before it or with `--replace` after it.
+- `--dry-run` signs in to both sides and counts; `brewless db:import-status <env>` follows a copy. A source on a private network (private Vapor or Aurora databases) needs a tunnel and `--local`.
+- On Vapor the `DB_*` values are not in `vapor env:pull`; they are on the database's page in the Vapor dashboard.
+- After MySQL to PostgreSQL the application has to work on PostgreSQL: text comparisons are case-sensitive there. Try it on a test environment first.
+
 ## Backups
 
 `backup` gives the application `BACKUP_BUCKET`, `BACKUP_REGION`, `BACKUP_ENDPOINT`, `BACKUP_ACCESS_KEY_ID` and `BACKUP_SECRET_ACCESS_KEY`. That key may **only put** objects (also in parts): it cannot read, list or delete. Write backups with it. Objects expire after `expire_days`. The key to restore is never in the application's variables.
