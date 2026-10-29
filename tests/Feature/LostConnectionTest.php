@@ -62,6 +62,17 @@ test('postgres saying it shuts down counts as going away too', function (): void
         ->and($tries)->toBe(3);
 });
 
+test('a private network that does not carry traffic yet after a cold start counts too', function (string $message): void {
+    $connection = flakyConnection(2, $tries, $message);
+
+    expect($connection->select('select 1 as one'))->toHaveCount(1)
+        ->and($tries)->toBe(3);
+})->with([
+    'postgres' => "SQLSTATE[08006] [7] connection to server at \"172.16.0.2\", port 5432 failed: No route to host\n\tIs the server running on that host and accepting TCP/IP connections?",
+    'postgres, no network' => 'SQLSTATE[08006] [7] connection to server at "172.16.0.2", port 5432 failed: Network is unreachable',
+    'mysql' => 'SQLSTATE[HY000] [2002] No route to host',
+]);
+
 test('after the seconds of brewless.database.retry_seconds it gives up with the error', function (): void {
     config(['brewless.database.retry_seconds' => 10]);
     $connection = flakyConnection(100, $tries);

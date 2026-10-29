@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.18.3 (29 October 2026)
+
+- A query that cannot reach the database because the network is not there yet ("No route to host", "Network is unreachable") is tried again for a while, like one whose connection was lost. A container that just started from zero can need a few seconds before its private network carries traffic; until now its first query failed at once, and with it the scheduler tick or job that ran it.
+
 ## 0.18.2 (28 October 2026)
 
 - The guidelines say to version a file in `public/` by its content, never by `filemtime()`: every file in a Brewless image carries the time of the commit, so a time-based `?v=` gives every file a new address on every deploy, and crawlers and open tabs then wake the container for the old addresses.

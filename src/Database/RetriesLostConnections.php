@@ -17,6 +17,10 @@ use Throwable;
  * database is restarted for maintenance (Scaleway's Serverless SQL Database
  * disconnects its clients for at most a minute, by default on Tuesdays between
  * 14:30 and 14:45 CEST) that one try comes too early and the request fails.
+ * The same holds for a container that just started from zero: its private
+ * network can take a few seconds to carry traffic, and until then connecting
+ * fails with "No route to host" (seen on Scaleway Serverless Containers on
+ * 29 October 2026, five seconds after a cold start).
  * Here the query is tried again with pauses of 1, 2, 4 and then 8 seconds,
  * until it runs or `brewless.database.retry_seconds` have passed.
  *
@@ -26,8 +30,10 @@ use Throwable;
 trait RetriesLostConnections
 {
     /**
-     * What PostgreSQL says while it shuts down or starts up, on top of what
-     * Laravel already counts as a lost connection.
+     * What PostgreSQL says while it shuts down or starts up, and what
+     * connecting says while the network to the database is not there yet, on
+     * top of what Laravel already counts as a lost connection. Laravel knows
+     * "No route to host" only after an SSL error, not when connecting fails.
      */
     private const array GOING_AWAY = [
         'terminating connection due to administrator command',
@@ -37,6 +43,10 @@ trait RetriesLostConnections
         'SQLSTATE[57P01]',
         'SQLSTATE[57P02]',
         'SQLSTATE[57P03]',
+        'failed: No route to host',
+        'failed: Network is unreachable',
+        '[2002] No route to host',
+        '[2002] Network is unreachable',
     ];
 
     /**
