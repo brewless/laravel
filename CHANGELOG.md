@@ -3,6 +3,11 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.18.5 (unreleased)
+
+- The README and the `brewless-databases` skill say that an application with a connection class of its own for `pgsql` or `mysql` keeps it, and has to add `Brewless\Laravel\Database\RetriesLostConnections` to it to get the tries of 0.18.3 and 0.18.4. Brewless's own application had such a class, and a release failed its first migration at once on "No route to host" while 0.18.4 was installed.
+- A test covers the release path: a release command whose first query finds no route to the database waits and runs, and one whose SQL is wrong fails the release at once.
+
 ## 0.18.4 (29 October 2026)
 
 - Connecting that ends in "timeout expired" is tried again for a while too. A Scaleway Serverless SQL Database that scaled to zero wakes up when it is connected to and can take longer than the connect timeout; a release whose migrations were the first to reach the databases in the morning failed on it, once on the central database and once on an organisation's.

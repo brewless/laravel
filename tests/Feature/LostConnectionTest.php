@@ -3,9 +3,14 @@
 declare(strict_types=1);
 
 use Brewless\Laravel\Database\PostgresConnection;
+use Brewless\Laravel\Database\RetriesLostConnections;
+use Brewless\Laravel\Ops\ReleaseFailed;
+use Brewless\Laravel\Ops\Runtime;
 use Brewless\Laravel\Tests\TestCase;
 use Illuminate\Database\Connection;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Sleep;
 
 uses(TestCase::class);
@@ -125,5 +130,56 @@ test('an error of another kind is not tried again', function (): void {
     $connection = flakyConnection(0, $tries);
 
     expect(fn () => $connection->select('select * from nothing_here'))->toThrow(QueryException::class, 'no such table');
+    Sleep::assertNeverSlept();
+});
+
+test('a connection class of the application\'s own that uses the trait tries again too', function (): void {
+    $tries = 0;
+    $pdo = static function () use (&$tries): PDO {
+        $tries++;
+
+        if ($tries <= 2) {
+            throw new PDOException('SQLSTATE[08006] [7] connection to server at "172.16.0.2", port 5432 failed: No route to host');
+        }
+
+        return new PDO('sqlite::memory:');
+    };
+    $connection = new class($pdo, 'shop', '', ['name' => 'pgsql', 'driver' => 'pgsql']) extends Illuminate\Database\PostgresConnection
+    {
+        use RetriesLostConnections;
+    };
+    $connection->setReconnector(static fn (Connection $connection) => $connection->setPdo($pdo)->setReadPdo($pdo));
+
+    expect($connection->select('select 1 as one'))->toHaveCount(1)
+        ->and($tries)->toBe(3);
+});
+
+test('a release command whose first query finds no route to the database waits and runs', function (): void {
+    $tries = 0;
+    $pdo = static function () use (&$tries): PDO {
+        $tries++;
+
+        if ($tries <= 3) {
+            throw new PDOException('SQLSTATE[08006] [7] connection to server at "172.16.0.2", port 5432 failed: No route to host');
+        }
+
+        return new PDO('sqlite::memory:');
+    };
+    // A new connection each time, as the driver makes one: Laravel reconnects by asking for a fresh one.
+    app('db')->extend('release-database', static fn (array $config, string $name) => new PostgresConnection($pdo, 'shop', '', [...$config, 'name' => $name]));
+    config(['database.connections.release-database' => ['driver' => 'pgsql'], 'brewless.ops.release_commands' => ['shop:reach-database']]);
+    Artisan::command('shop:reach-database', fn () => DB::connection('release-database')->select('select 1'));
+
+    expect(resolve(Runtime::class)->release())->toHaveKey('seconds')
+        ->and($tries)->toBe(4);
+});
+
+test('a release command whose SQL is wrong fails the release at once', function (): void {
+    $connection = flakyConnection(0, $tries);
+    app('db')->extend('release-database', static fn () => $connection);
+    config(['database.connections.release-database' => ['driver' => 'pgsql'], 'brewless.ops.release_commands' => ['shop:reach-database']]);
+    Artisan::command('shop:reach-database', fn () => DB::connection('release-database')->select('select * from nothing_here'));
+
+    expect(fn () => resolve(Runtime::class)->release())->toThrow(ReleaseFailed::class, 'shop:reach-database');
     Sleep::assertNeverSlept();
 });

@@ -59,6 +59,7 @@ brewless logs production --source=release
 - It holds one database. Environments that share it share its tables.
 - It uses `DB_SSLMODE`. Keep the connection's `sslmode` reading that variable.
 - Scaleway restarts it for maintenance, by default on Tuesdays between 14:30 and 14:45 CEST, disconnecting clients for at most a minute. `brewless/laravel` tries a query again for up to `BREWLESS_DB_RETRY_SECONDS` (60) after a lost connection, outside transactions. Keep transactions short, and do not schedule releases in that window.
+- The same tries cover a container whose Private Network is not there yet after a cold start ("No route to host") and a database that is still waking up ("timeout expired"). They live in the connection class the package registers for `pgsql` and `mysql`. An application that registers a connection class of its own (`Connection::resolverFor`) keeps it: add `use Brewless\Laravel\Database\RetriesLostConnections;` to that class, or its first release command can fail at once.
 
 ## Queues
 

@@ -217,8 +217,26 @@ when its connection went away, at once, which is too early then. The package
 gives the `pgsql` and `mysql` drivers a connection that tries the query again
 with pauses of 1, 2, 4 and then 8 seconds, for up to `BREWLESS_DB_RETRY_SECONDS`
 (60). Never inside a transaction, as in Laravel: what ran before in it went
-with the connection. An application with a connection class of its own for a
-driver keeps it.
+with the connection. The same tries cover a container that just started, whose
+Private Network can take a few seconds to carry traffic ("No route to host"),
+and a Serverless SQL Database that is still waking up ("timeout expired"), so
+the first release command, job or request to reach the database waits for it.
+An error in the query itself is never tried again.
+
+An application with a connection class of its own for a driver
+(`Connection::resolverFor('pgsql', ...)`) keeps it, and then has to add the
+tries to it, or its first query fails at once on a network that is not there
+yet:
+
+```php
+use Brewless\Laravel\Database\RetriesLostConnections;
+use Illuminate\Database\PostgresConnection;
+
+final class AppPostgresConnection extends PostgresConnection
+{
+    use RetriesLostConnections;
+}
+```
 
 ### A cache in cluster mode
 
