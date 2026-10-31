@@ -1,6 +1,6 @@
 ---
 name: brewless-databases
-description: "Manages the data side of a Laravel application on Brewless: its database (Serverless SQL Database or Managed PostgreSQL/MySQL at Scaleway), migrations as release commands, queues (Scaleway Queues or database), file storage buckets, a bucket for backups, a Redis cache over TLS, the Private Network, and a database per tenant made at runtime with Brewless\\Laravel\\Databases\\DatabaseClient. Use when the user wants to add or change a database, cache, queue or bucket on Brewless, run or debug migrations, connect to the database, set up backups, or create a database per tenant in a multi-tenant application."
+description: "Manages the data side of a Laravel application on Brewless: its database (Serverless SQL Database or Managed PostgreSQL/MySQL at Scaleway), migrations as release commands, queues (Scaleway Queues or database), file storage buckets, a bucket for backups, a Redis cache over TLS, the Private Network, a database per tenant made at runtime with Brewless\\Laravel\\Databases\\DatabaseClient, and capacity boosts (more vCPU for a planned peak) with Brewless\\Laravel\\Capacity\\CapacityClient. Use when the user wants to add or change a database, cache, queue or bucket on Brewless, run or debug migrations, connect to the database, set up backups, create a database per tenant in a multi-tenant application, or give the database more capacity for a sale, launch or other peak."
 license: MIT
 metadata:
   author: brewless
@@ -118,3 +118,23 @@ $databases->delete('shop-'.$tenant->id);  // removed at Scaleway now, with every
   All extend `DatabaseException`.
 - `$databases->configured()` says whether `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT` and `BREWLESS_DATABASES_KEY` are present. They arrive with the next deploy after `databases` is added.
 - **Deleting is permanent.** Only call `delete()` where the application really ends a tenant, and never in a test against a real environment.
+
+## Capacity boosts
+
+More vCPU on the environment's Serverless SQL Database for a while, for a peak the application knows is coming. Business plan and up; the owner switches the capacity key on in the console, which shows `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT` and `BREWLESS_CAPACITY_KEY` once; put them in the environment's variables (`brewless env:push`) and deploy.
+
+```php
+use Brewless\Laravel\Capacity\CapacityApi;
+use Brewless\Laravel\Capacity\CapacityException;
+
+try {
+    resolve(CapacityApi::class)->schedule("event-{$event->id}-sale", $start, $start->copy()->addHours(2), min: 4, max: 15, prewarm: 15, cooldown: 30);
+} catch (CapacityException $exception) {
+    report($exception); // the application goes on without the boost
+}
+```
+
+- **One key per occasion** (`event-123-sale`). The same key with the same values is the same boost; with other values it is refused (409). Move a boost with `reschedule()` or `update()`, call it off with `cancel()`, lengthen it with `extend()`.
+- **Never let the application's own work depend on a boost.** Catch `CapacityException` around every call. `ready($key)` before a peak may warn the team; it must never block anything.
+- **Keep the prewarming.** A large raise (4 to 8, 6 to 15 vCPU) restarts the database: connections drop and it is unreachable for up to about two minutes. Prewarming (15 minutes by default) puts that before the peak.
+- **Tests** use `CapacityClient::fake()` with `assertScheduled()`, `assertCancelled()`, `assertNothingScheduled()` and `markReady()`; type-hint `CapacityApi` so the fake takes its place.

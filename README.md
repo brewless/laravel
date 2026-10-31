@@ -290,6 +290,151 @@ minutes off, a name it does not make; `->status` is the HTTP status),
 slow down (safe to ask again), and `DatabaseNotReady` when waiting ends in an
 error or takes too long.
 
+### Database capacity boosts
+
+A Serverless SQL Database grows with its load between the bounds Brewless
+gives it, but growing takes time, and a peak the application knows is coming
+(a ticket sale at ten, a newsletter at noon) is better met by a database that
+is already big. A boost asks Brewless for more vCPU for a while: at least
+`min` and at most `max`, from the start to the end. Brewless raises the
+database `prewarm` minutes before the start and lowers it again `cooldown`
+minutes after the end.
+
+Boosts come with the Business plan and up. The owner switches the capacity
+key on for the environment in the Brewless console, which shows the key once,
+with `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT` and `BREWLESS_CAPACITY_KEY`.
+Put those three in the environment's variables (`brewless env:push` or the
+console); the next deploy gives them to the containers.
+
+Type-hint `Brewless\Laravel\Capacity\CapacityApi` (or resolve it), so a test
+can put the fake in its place. A ticket shop that boosts its database for
+every sale, in an observer of its event model:
+
+```php
+use Brewless\Laravel\Capacity\CapacityApi;
+use Brewless\Laravel\Capacity\CapacityException;
+use Brewless\Laravel\Capacity\CapacityRefused;
+use Illuminate\Support\Facades\Log;
+
+final class EventCapacity
+{
+    public function __construct(private CapacityApi $capacity) {}
+
+    /** A new event with a sale start: the database is at 4 vCPU or more for the first two hours of the sale. */
+    public function created(Event $event): void
+    {
+        $this->quietly(fn () => $this->capacity->schedule(
+            "event-{$event->id}-sale",
+            $event->sale_starts_at,
+            $event->sale_starts_at->addHours(2),
+            min: 4,
+            max: 15,
+            prewarm: 15,
+            cooldown: 30,
+            name: "Sale of {$event->name}",
+        ));
+    }
+
+    /** The sale start moved: the same key, moved with it. Cancelled: the boost is called off. */
+    public function updated(Event $event): void
+    {
+        if ($event->wasChanged('cancelled_at') && $event->cancelled_at !== null) {
+            $this->quietly(fn () => $this->capacity->cancel("event-{$event->id}-sale"));
+        } elseif ($event->wasChanged('sale_starts_at')) {
+            $this->quietly(fn () => $this->capacity->reschedule(
+                "event-{$event->id}-sale",
+                $event->sale_starts_at,
+                $event->sale_starts_at->addHours(2),
+            ));
+        }
+    }
+
+    /** The application goes on without the boost when Brewless cannot be reached or says no. */
+    private function quietly(callable $call): void
+    {
+        try {
+            $call();
+        } catch (CapacityException $exception) {
+            Log::warning('No capacity boost: '.$exception->getMessage());
+        }
+    }
+}
+```
+
+And, if you like, a scheduled check a few minutes before a sale starts. It
+tells the team when the database is not there yet; it never holds the sale
+back:
+
+```php
+try {
+    if (! $capacity->ready("event-{$event->id}-sale")) {
+        Notification::route('mail', 'team@example.com')->notify(new SaleDatabaseNotReady($event));
+    }
+} catch (CapacityException) {
+    // Brewless out of reach: the sale goes ahead, as it would without a boost.
+}
+```
+
+| Method | What it does |
+| --- | --- |
+| `schedule($key, $starts, $ends, min:, max:, prewarm: 15, cooldown: 30, name:, database:)` | Plans a boost. The same key with the same values gives the same boost; the same key with other values is refused (409) |
+| `boost($key, $minutes, min:, max:, name:, database:)` | Starts a boost now, without prewarming |
+| `reschedule($key, $starts, $ends)` | Moves a boost that has not begun |
+| `update($key, [...])` | Changes `name`, `min_vcpu`, `max_vcpu`, `starts_at`, `ends_at`, `minutes`, `prewarm_minutes` or `cooldown_minutes` of a boost that has not begun; once it began, only a later `ends_at` |
+| `extend($key, $until)` | Lets a boost run longer |
+| `cancel($key)` | Calls a boost off: one that has not begun at once, a running one ends now and cools down |
+| `status($key)` | The `Boost` as it stands (`status`, `ready`, `startsAt`, `windowStartsAt`, `cpuCurrent`, the estimate in cents), or null |
+| `ready($key)` | True only once Scaleway reports the database at the boost's minimum |
+| `databases()` | The databases the environment may boost, with their normal bounds and the bounds now |
+| `configured()` | Whether the three variables are there |
+
+`database` is only needed when the environment uses more than one database;
+it defaults to the environment's own Serverless SQL Database. A key has 1 to
+100 letters, digits, dots, colons, underscores and dashes, and names one
+boost per database: use one per occasion (`event-123-sale`), never one per
+request.
+
+**Why prewarming.** Raising the minimum wakes a sleeping database within
+seconds, and a small raise (0 to 4, 4 to 6 vCPU) takes seconds. A raise beyond
+what the database's current host holds makes Scaleway restart it: open
+connections are closed and it cannot be reached for up to about two minutes
+(96 to 110 seconds measured, 4 to 8 and 6 to 15 vCPU). That should happen
+before the peak, not in it: hence the 15 minutes of prewarming by default. The
+package tries a query again after a lost connection (see *Through a database
+restart*). Going down never restarts the database. Brewless never queries your
+database: what it reports comes from Scaleway's API.
+
+Every request is signed like the databases client's, with
+`BREWLESS_CAPACITY_KEY`. When Brewless or Scaleway cannot be reached, is
+busy (5xx) or asks to slow down (429), the client tries again after half a
+second, a second and two seconds, each time with a new signature; that is
+safe because a key makes one boost. What can go wrong is a
+`Brewless\Laravel\Capacity\CapacityException`:
+
+- `CapacityUnavailable`: one of the three variables is missing, nothing was sent (a laptop, a test, an environment without the key);
+- `CapacityUnreachable`: still no answer after the last try; safe to ask again later with the same key;
+- `CapacityRefused`: Brewless said no, with `->status`: 401 a wrong signature or a clock more than five minutes off, 403 a key that is switched off or a plan without boosts, 404 an unknown boost or database, 409 (`->isConflict()`) a key used before with other values, 422 (`->isInvalid()`) a value it does not take or a limit of the key, with `->errors` per field.
+
+In the application's own tests, `CapacityClient::fake()` puts an in-memory
+client in place of `CapacityApi` that sends nothing:
+
+```php
+use Brewless\Laravel\Capacity\Boost;
+use Brewless\Laravel\Capacity\CapacityClient;
+
+$capacity = CapacityClient::fake();
+
+Event::factory()->create(['id' => 7, 'sale_starts_at' => now()->addWeek()]);
+
+$capacity->assertScheduled('event-7-sale', fn (Boost $boost) => $boost->minVcpu === 4);
+$capacity->assertNotScheduled('event-8-sale');
+$capacity->assertCancelled('event-7-sale');
+$capacity->assertNothingScheduled();
+
+$capacity->markReady('event-7-sale');    // ready() is false until a test says so
+$capacity->unreachable();                // every call throws CapacityUnreachable
+```
+
 ### Mail
 
 With Scaleway Transactional Email as the mailer (`mail` in `brewless.yml`, the default of a production environment with a domain), the package does two things, each only when Brewless gave the container its variables:
@@ -362,6 +507,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_REDIS_CA` | The certificate of the cache's cluster, base64; the redis connections then speak TLS and trust only that certificate |
 | `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY`, `SQS_ENDPOINT` | The key and address of a queue at Scaleway Queues; handed to the `sqs` connection, which otherwise shares `AWS_*` with the `s3` disk |
 | `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT`, `BREWLESS_DATABASES_KEY` | Where and as which environment to ask Brewless for a database per tenant, and the key to sign with; set by Brewless with `databases` in `brewless.yml` |
+| `BREWLESS_CAPACITY_KEY` | The key to sign capacity boosts with (with `BREWLESS_API_URL` and `BREWLESS_ENVIRONMENT`); shown once in the Brewless console when the owner switches it on |
 | `BREWLESS_DB_RETRY_SECONDS` | How long a query whose connection went away is tried again (`60`); `0` keeps Laravel's single try |
 | `RELEASE` | The running image; set by Brewless on each release |
 
