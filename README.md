@@ -301,9 +301,10 @@ database `prewarm` minutes before the start and lowers it again `cooldown`
 minutes after the end.
 
 Boosts come with the Business plan and up. The owner switches the capacity
-key on for the environment in the Brewless console, which shows the key once;
-from the next deploy every container has `BREWLESS_API_URL`,
-`BREWLESS_ENVIRONMENT` and `BREWLESS_CAPACITY_KEY`.
+key on for the environment in the Brewless console, which shows the key once,
+with `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT` and `BREWLESS_CAPACITY_KEY`.
+Put those three in the environment's variables (`brewless env:push` or the
+console); the next deploy gives them to the containers.
 
 Type-hint `Brewless\Laravel\Capacity\CapacityApi` (or resolve it), so a test
 can put the fake in its place. A ticket shop that boosts its database for

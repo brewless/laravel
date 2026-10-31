@@ -121,7 +121,7 @@ $databases->delete('shop-'.$tenant->id);  // removed at Scaleway now, with every
 
 ## Capacity boosts
 
-More vCPU on the environment's Serverless SQL Database for a while, for a peak the application knows is coming. Business plan and up; the owner switches the capacity key on in the console (shown once), and the next deploy gives `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT` and `BREWLESS_CAPACITY_KEY`.
+More vCPU on the environment's Serverless SQL Database for a while, for a peak the application knows is coming. Business plan and up; the owner switches the capacity key on in the console, which shows `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT` and `BREWLESS_CAPACITY_KEY` once; put them in the environment's variables (`brewless env:push`) and deploy.
 
 ```php
 use Brewless\Laravel\Capacity\CapacityApi;
