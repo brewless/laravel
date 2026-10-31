@@ -3,6 +3,12 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## Unreleased
+
+- `Brewless\Laravel\Capacity\CapacityClient` asks Brewless for a capacity boost on the environment's Serverless SQL Database: more vCPU for a while, for a peak the application knows is coming. `schedule()` plans one, `boost()` starts one now, `reschedule()` and `update()` change one that has not begun, `extend()` lets one run longer, `cancel()` calls one off, `status()` and `ready()` say where it stands, `databases()` lists what the environment may boost. It needs `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT` and `BREWLESS_CAPACITY_KEY`, which Brewless gives the containers once the owner switches the capacity key on (Business plan and up); without them every call throws `CapacityUnavailable` and sends nothing. Every request is signed like the databases client's. Brewless out of reach, a 5xx or a 429 is tried again after 0.5, 1 and 2 seconds with a new signature each time, then becomes `CapacityUnreachable`; a refusal is a `CapacityRefused` with the status, and for a 422 the fields. All extend `CapacityException`.
+- `CapacityClient::fake()` puts an in-memory client in place of `CapacityApi` for an application's own tests, with `assertScheduled()`, `assertNotScheduled()`, `assertNothingScheduled()`, `assertCancelled()`, `assertNotCancelled()`, `markReady()` and `unreachable()`.
+- The README describes capacity boosts with a ticket shop as the example, and the `brewless-databases` skill tells a coding agent how to use them.
+
 ## 0.18.5 (29 October 2026)
 
 - The `brewless-databases` skill tells a coding agent that a Serverless SQL Database shares its sessions through a pooler, so a session setting of one client can reach another, and that `pg_dump` gets a database user of its own: it empties the `search_path` of its session, and an application query that lands there afterwards no longer finds its tables (`relation "cache_locks" does not exist` on PrivaSearch, three nights in a row).
