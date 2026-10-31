@@ -173,6 +173,30 @@ return [
     ],
 
     /*
+    | Capacity boosts for the environment's Serverless SQL Database.
+    |
+    | More vCPU for a while, for a peak the application knows is coming: a
+    | ticket sale, a newsletter. The application asks Brewless with the client
+    | Brewless\Laravel\Capacity\CapacityClient. Brewless gives every
+    | container these three once the owner switched the capacity key on in
+    | the console; every request is signed with the key, which is never sent
+    | itself.
+    */
+    'capacity' => [
+        'url' => env('BREWLESS_API_URL'),
+        'environment' => env('BREWLESS_ENVIRONMENT'),
+        'key' => env('BREWLESS_CAPACITY_KEY'),
+
+        // Seconds a request to Brewless may take, and may take to connect.
+        'timeout' => 10,
+        'connect_timeout' => 5,
+
+        // Milliseconds to wait before each new try when Brewless or Scaleway
+        // could not be reached, was busy (5xx) or asked to slow down (429).
+        'retry_milliseconds' => [500, 1000, 2000],
+    ],
+
+    /*
     | The application's own database. A query whose connection went away, as
     | when the provider restarts the database for maintenance, is tried again
     | for up to this many seconds instead of once (never inside a

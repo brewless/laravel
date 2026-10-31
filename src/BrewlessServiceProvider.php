@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Brewless\Laravel;
 
+use Brewless\Laravel\Capacity\CapacityApi;
+use Brewless\Laravel\Capacity\CapacityClient;
 use Brewless\Laravel\Database\MySqlConnection;
 use Brewless\Laravel\Database\PostgresConnection;
 use Brewless\Laravel\Databases\DatabaseClient;
@@ -71,6 +73,17 @@ final class BrewlessServiceProvider extends ServiceProvider
             (int) config('brewless.databases.timeout', 15),
             (int) config('brewless.databases.connect_timeout', 5),
         ));
+
+        $this->app->bind(CapacityClient::class, static fn (Application $app): CapacityClient => new CapacityClient(
+            $app->make(Factory::class),
+            self::setting('brewless.capacity.url'),
+            self::setting('brewless.capacity.environment'),
+            self::setting('brewless.capacity.key'),
+            (int) config('brewless.capacity.timeout', 10),
+            (int) config('brewless.capacity.connect_timeout', 5),
+            array_values(array_map(intval(...), (array) config('brewless.capacity.retry_milliseconds', [500, 1000, 2000]))),
+        ));
+        $this->app->bind(CapacityApi::class, CapacityClient::class);
     }
 
     /**
@@ -195,7 +208,7 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $defaults = require __DIR__.'/../config/brewless.php';
 
-        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases', 'database', 'mail'] as $section) {
+        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases', 'capacity', 'database', 'mail'] as $section) {
             config(['brewless.'.$section => array_replace($defaults[$section], (array) config('brewless.'.$section))]);
         }
     }
