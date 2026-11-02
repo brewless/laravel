@@ -99,6 +99,9 @@ own domain, so the edge sends that Host and carries the real hostname in
 the secret from `BREWLESS_EDGE_SECRET`, and only for the domains in
 `BREWLESS_DOMAINS` (default: the host of `APP_URL`) and their subdomains.
 Calling the container directly with a made-up hostname changes nothing.
+A request with the secret is also marked as HTTPS: the edge forces HTTPS for
+every visitor, so the URLs Laravel generates (assets, links, redirects) start
+with `https://` without trusting a proxy in `TrustProxies`.
 
 The visitor's address is treated the same way. With an edge secret set, only
 the entry the edge appended to `X-Forwarded-For` is kept, and a request

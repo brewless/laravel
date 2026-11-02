@@ -14,6 +14,18 @@ test('through the edge the visitor hostname is put back, and the secret goes no 
     $this->get('/host', ['X-Brewless-Edge' => TestCase::EDGE_SECRET, 'Cdn-Host' => 'shop.example'])->assertSee('shop.example|secret-gone');
 });
 
+test('through the edge the request is https, so generated urls are too', function (): void {
+    $this->get('http://localhost/url', ['X-Brewless-Edge' => TestCase::EDGE_SECRET, 'Cdn-Host' => 'www.shop.example'])
+        ->assertSee('https://www.shop.example/build/app.css|secure');
+});
+
+test('without the edge secret the scheme stays what the container saw', function (array $headers): void {
+    $this->get('http://localhost/url', $headers)->assertSee('http://localhost/build/app.css|plain');
+})->with([
+    'no secret' => [['X-Forwarded-Proto' => 'https']],
+    'wrong secret' => [['X-Brewless-Edge' => 'guess', 'Cdn-Host' => 'www.shop.example']],
+]);
+
 test('without the edge secret nobody chooses a hostname', function (): void {
     $this->get('/host', ['Cdn-Host' => 'www.shop.example'])->assertSee('localhost|');
     $this->get('/host', ['X-Brewless-Edge' => 'wrong', 'Cdn-Host' => 'www.shop.example'])->assertSee('localhost|secret-gone');
