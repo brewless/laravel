@@ -28,6 +28,12 @@ use Symfony\Component\HttpFoundation\Response;
  * provider's own front end, which appends the address it saw as the last
  * entry. Only that entry is kept: what a visitor wrote in front of it is not
  * believed, so rate limits count the real visitor here too.
+ *
+ * The edge forces HTTPS on every request and reaches the container over a
+ * connection of its own, so a request with the secret was HTTPS for the
+ * visitor whatever the container saw. It is marked so, and the URLs the
+ * application generates (assets, links, redirects) start with https://
+ * without the application having to trust a proxy.
  */
 final class TrustEdgeHost
 {
@@ -54,6 +60,10 @@ final class TrustEdgeHost
             $request->server->set('SERVER_NAME', $host);
         }
 
+        if ($fromEdge) {
+            $this->markSecure($request);
+        }
+
         $this->keepOnly($request, $fromEdge ? $this->visitorAddress($request) : null);
 
         // The secret has done its job; nothing further down needs to see it.
@@ -74,6 +84,20 @@ final class TrustEdgeHost
 
         $request->headers->set('X-Forwarded-For', $address);
         $request->server->set('HTTP_X_FORWARDED_FOR', $address);
+    }
+
+    /**
+     * HTTPS on port 443, for Symfony's own check and for an application that
+     * trusts its proxies and reads the forwarded headers instead.
+     */
+    private function markSecure(Request $request): void
+    {
+        $request->server->set('HTTPS', 'on');
+        $request->server->set('SERVER_PORT', 443);
+        $request->headers->set('X-Forwarded-Proto', 'https');
+        $request->headers->set('X-Forwarded-Port', '443');
+        $request->server->set('HTTP_X_FORWARDED_PROTO', 'https');
+        $request->server->set('HTTP_X_FORWARDED_PORT', '443');
     }
 
     private function edgeHost(Request $request): ?string

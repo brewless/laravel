@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.20.0 (2 November 2026)
+
+- A request through the edge (with the edge secret) is HTTPS for the application. The edge forces HTTPS for every visitor but reaches the container over a connection of its own, so Laravel saw `http` and generated `http://` URLs for assets, links and redirects; a browser blocks such a stylesheet or script on an HTTPS page as mixed content. An application no longer has to trust its proxies for this.
+
 ## 0.19.0 (31 October 2026)
 
 - `Brewless\Laravel\Capacity\CapacityClient` asks Brewless for a capacity boost on the environment's Serverless SQL Database: more vCPU for a while, for a peak the application knows is coming. `schedule()` plans one, `boost()` starts one now, `reschedule()` and `update()` change one that has not begun, `extend()` lets one run longer, `cancel()` calls one off, `status()` and `ready()` say where it stands, `databases()` lists what the environment may boost. It needs `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT` and `BREWLESS_CAPACITY_KEY`, which the Brewless console shows once when the owner switches the capacity key on (Business plan and up), to put in the environment's variables; without them every call throws `CapacityUnavailable` and sends nothing. Every request is signed like the databases client's. Brewless out of reach, a 5xx or a 429 is tried again after 0.5, 1 and 2 seconds with a new signature each time, then becomes `CapacityUnreachable`; a refusal is a `CapacityRefused` with the status, and for a 422 the fields. All extend `CapacityException`.
