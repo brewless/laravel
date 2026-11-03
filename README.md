@@ -207,6 +207,10 @@ overwrite a `__Host-` cookie of another, so an application on a neighbouring
 test address cannot put a session of its own on yours. On your own domains the
 session cookie keeps its name and settings.
 
+### A cache in a bucket, with locks
+
+Where an environment has a bucket and no Redis or database, Brewless names `CACHE_STORE=storage` with `CACHE_STORAGE_DISK=s3`: Laravel's `storage` cache, its values in Object Storage, which every container reads and which outlives a container that goes away. Laravel's own store of it has no locks; the package puts one in its place that has them, so `Cache::lock()`, a `ShouldBeUnique` job and `WithoutOverlapping` work. Object Storage cannot hold a lock, so the lock is Laravel's file lock on the container's own disk (`storage/framework/cache/locks`, or `lock_path` in the store's config): atomic within a container, not across containers. Work that must run only once across the whole environment needs a cache the containers share, such as Redis.
+
 ### A cache over TLS
 
 A cache at Scaleway (`cache` in `brewless.yml`) is a Managed Database for Redis on the Private Network of your project, reached over TLS with a certificate of its own cluster. Brewless gives the application that certificate as `BREWLESS_REDIS_CA` (base64), next to `REDIS_HOST`, `REDIS_PORT`, `REDIS_USERNAME` and `REDIS_PASSWORD`. With it, the package makes the `default` and `cache` redis connections speak TLS and trust that certificate and no other (`brewless.redis.connections` names them). The host is an address on the Private Network, which no certificate names, so the name is not checked; the certificate is. Without the variable your redis connections are left as you configured them.

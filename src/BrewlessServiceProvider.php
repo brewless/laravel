@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Brewless\Laravel;
 
+use Brewless\Laravel\Cache\LockingStorageStore;
 use Brewless\Laravel\Capacity\CapacityApi;
 use Brewless\Laravel\Capacity\CapacityClient;
 use Brewless\Laravel\Database\MySqlConnection;
@@ -20,6 +21,8 @@ use Brewless\Laravel\Mail\MailCopies;
 use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
 use Closure;
+use Illuminate\Cache\CacheManager;
+use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
@@ -230,6 +233,20 @@ final class BrewlessServiceProvider extends ServiceProvider
         $this->app->afterResolving('queue', function (QueueManager $queues): void {
             $queues->extend('sqs', static fn (): SignedSqsConnector => new SignedSqsConnector);
             $queues->extend('database', fn (): SignedDatabaseConnector => new SignedDatabaseConnector($this->app['db']));
+        });
+
+        // The `storage` cache keeps its values in a bucket; this one takes locks too, on the container's own disk.
+        $this->app->afterResolving('cache', function (CacheManager $cache): void {
+            $cache->extend('storage', function (Application $app, array $config): Repository {
+                /** @var CacheManager $this */
+                return $this->repository(new LockingStorageStore(
+                    $app['filesystem']->disk($config['disk'] ?? null),
+                    (string) ($config['path'] ?? ''),
+                    $this->getPrefix($config),
+                    (string) ($config['lock_path'] ?? storage_path('framework/cache/locks')),
+                    $this->getSerializableClasses($config),
+                ), $config);
+            });
         });
 
         // A copy of every mail sent, when the environment keeps them.
