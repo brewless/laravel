@@ -32,8 +32,10 @@ use Symfony\Component\HttpFoundation\Response;
  * collected only when a session is kept: with sessions in a database, a
  * guest on a public page does not wake it.
  *
- * - the answer is an HTML page: an empty answer or JSON (Sanctum's
- *   `/sanctum/csrf-cookie`, for one) is asked for to get those cookies.
+ * - the answer is no empty answer or JSON: those (Sanctum's
+ *   `/sanctum/csrf-cookie`, for one) are asked for to get those cookies. An
+ *   HTML page goes without them, and so does a text file such as llms.txt,
+ *   a sitemap or a page as markdown.
  *
  * Anything else keeps its session exactly as before: a form, a page that put
  * something in the session (an intended URL, a flash message), a streamed
@@ -109,7 +111,7 @@ final class StartSessionWhenNeeded extends StartSession
 
     private function unneeded(Request $request, Session $session, Response $response): bool
     {
-        if (! self::enabled() || ! str_starts_with(strtolower((string) $response->headers->get('Content-Type')), 'text/html')) {
+        if (! self::enabled() || $this->askedForCookies($request, $response)) {
             return false;
         }
 
@@ -126,6 +128,26 @@ final class StartSessionWhenNeeded extends StartSession
 
         // A streamed answer cannot be read back: it keeps its session.
         return is_string($content) && (! is_string($token) || $token === '' || ! str_contains($content, $token));
+    }
+
+    /**
+     * Whether the answer is what a script asks for to get the session and
+     * XSRF-TOKEN cookies: an empty answer or JSON (Sanctum's
+     * `/sanctum/csrf-cookie`, for one). Any other answer, an HTML page or a
+     * text file such as llms.txt, a sitemap or a page as markdown, is read
+     * for its content: with a cookie the edge never keeps it, and every
+     * visit wakes the container (seen on coding.agency, 3 November 2026).
+     */
+    private function askedForCookies(Request $request, Response $response): bool
+    {
+        $type = strtolower((string) $response->headers->get('Content-Type'));
+
+        // A HEAD has no body by nature: only its type says what it is.
+        $empty = $response->getStatusCode() === 204 || ($response->getContent() === '' && ! $request->isMethod('HEAD'));
+
+        return $empty
+            || str_starts_with($type, 'application/json')
+            || preg_match('#^application/[^;]+\+json#', $type) === 1;
     }
 
     /**

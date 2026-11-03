@@ -188,6 +188,20 @@ test('an empty answer or JSON keeps its cookies: a script asks for them (Sanctum
     }
 });
 
+test('a text answer that is not HTML goes without a session too, so the edge may keep it (llms.txt, a sitemap, markdown)', function (string $type): void {
+    Route::middleware('web')->get('/plain', fn () => response('# Shop', 200, ['Content-Type' => $type]));
+
+    $response = $this->get('/plain');
+
+    expect(cookieNames($response))->toBe([]);
+})->with(['text/plain; charset=utf-8', 'application/xml', 'text/markdown; charset=utf-8', 'text/css']);
+
+test('a text answer that carries the CSRF token keeps its session', function (): void {
+    Route::middleware('web')->get('/token.txt', fn () => response('token: '.csrf_token(), 200, ['Content-Type' => 'text/plain']));
+
+    expect(cookieNames($this->get('/token.txt')))->toContain('shop_session', 'XSRF-TOKEN');
+});
+
 test('unset, it follows the CSRF check: on where a same-origin request needs no token', function (): void {
     config(['brewless.edge.stateless_guests' => null]);
 
