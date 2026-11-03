@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## Unreleased
+
+- The README and the `brewless-databases` skill describe the files address: Brewless serves the public files of an environment's bucket at `cdn.<domain>` (or `storage.cdn` in `brewless.yml`) through bunny.net and gives the containers `AWS_URL` with it once it answers with its certificate. Only files stored as public are served; an `AWS_URL` of your own always wins. Nothing changes in the package: Laravel's `s3` disk reads `AWS_URL` itself.
+
 ## 0.21.0 (3 November 2026)
 
 - The `storage` cache takes locks. Laravel's own StorageStore has none, so `Cache::lock()`, a `ShouldBeUnique` job and `WithoutOverlapping` failed on it with "Call to undefined method StorageStore::lock()"; spatie/laravel-og-image did on every image it made. The package's store keeps the values in the bucket as before and takes the lock with Laravel's file lock on the container's own disk (`storage/framework/cache/locks`, or `lock_path` in the store's config): atomic within a container, not across containers. Nothing to set: `CACHE_STORE=storage` gets it.

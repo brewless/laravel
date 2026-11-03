@@ -24,6 +24,9 @@ environments:
     database: shop-main        # by name; a new or existing one; false for none
     queue: sqs                 # sqs (Scaleway Queues), database, or false
     storage: shop-files        # a private bucket; FILESYSTEM_DISK=s3
+    # storage:                 # the map form
+    #   name: shop-files
+    #   cdn: files.example.com # public files at their own address (default cdn.<APP_URL host>); false for none
     network: private           # Private Network for Managed databases and the cache
     cache:                     # a Managed Database for Redis, on the Private Network
       name: shop-cache
@@ -37,6 +40,7 @@ environments:
   - Serverless SQL Database is only in `fr-par`.
   - Scaleway Queues is only in `fr-par` and `nl-ams`.
   - A cache is not offered in `it-mil`.
+- **Files address.** Behind bunny.net, files stored with public visibility are served at `cdn.<APP_URL host>`; a deploy sets `AWS_URL` to it once its certificate is live, unless the user set `AWS_URL` themselves. Private files keep using `Storage::temporaryUrl()`.
 - **Database variables.** The database's `DB_*` variables are written into the environment's Secret Manager. Read them with `brewless env:pull <environment>`; never copy credentials into the repository.
 - **Existing Managed Database.** It needs `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` from the user before the first deploy.
 
