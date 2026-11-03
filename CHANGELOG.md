@@ -3,6 +3,10 @@
 Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
 version may change a route or a setting.
 
+## 0.21.0 (3 November 2026)
+
+- The `storage` cache takes locks. Laravel's own StorageStore has none, so `Cache::lock()`, a `ShouldBeUnique` job and `WithoutOverlapping` failed on it with "Call to undefined method StorageStore::lock()"; spatie/laravel-og-image did on every image it made. The package's store keeps the values in the bucket as before and takes the lock with Laravel's file lock on the container's own disk (`storage/framework/cache/locks`, or `lock_path` in the store's config): atomic within a container, not across containers. Nothing to set: `CACHE_STORE=storage` gets it.
+
 ## 0.20.1 (3 November 2026)
 
 - A guest without a cookie goes without a session on a text answer that is not HTML too: `llms.txt`, a sitemap, a page as markdown, a stylesheet. Until now only an HTML page did, so such an answer set the session and `XSRF-TOKEN` cookies, the edge never kept it and every request woke the container; on coding.agency a check of `llms.txt` timed out on a cold start. An empty answer (204, or an empty GET) and JSON keep their cookies as before, since a script asks for those to get them, and an answer that carries the CSRF token keeps its session.
