@@ -1,7 +1,14 @@
 # Changelog
 
-Versions follow [semantic versioning](https://semver.org); before 1.0 a minor
-version may change a route or a setting.
+Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
+route or a setting only changes in a major version.
+
+## 1.0.0 (4 November 2026)
+
+- First stable release. The package has carried Brewless's own site and its
+  customers' applications since October; the routes, the variables and the
+  settings are what they will stay, and a change to any of them now needs a
+  major version. No code changed since 0.21.1.
 
 ## 0.21.1 (3 November 2026)
 
