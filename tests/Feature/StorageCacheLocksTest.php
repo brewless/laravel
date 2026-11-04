@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Brewless\Laravel\Cache\LockingStorageStore;
 use Brewless\Laravel\Tests\TestCase;
+use Illuminate\Cache\StorageStore;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -17,6 +18,10 @@ uses(TestCase::class);
  */
 
 beforeEach(function (): void {
+    if (! class_exists(StorageStore::class)) {
+        $this->markTestSkipped('The storage cache came with Laravel 13.');
+    }
+
     Storage::fake('s3');
     config([
         'cache.default' => 'storage',

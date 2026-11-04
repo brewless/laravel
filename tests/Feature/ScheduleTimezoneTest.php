@@ -11,7 +11,7 @@ uses(TestCase::class);
 function bootWith(array $config): void
 {
     config($config);
-    new BrewlessServiceProvider(app())->register();
+    (new BrewlessServiceProvider(app()))->register();
 }
 
 test('the schedule runs in Amsterdam time when the application chose no zone for it', function (): void {

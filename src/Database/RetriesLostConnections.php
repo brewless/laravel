@@ -46,6 +46,8 @@ trait RetriesLostConnections
         'SQLSTATE[57P01]',
         'SQLSTATE[57P02]',
         'SQLSTATE[57P03]',
+        // Laravel 13 knows this one itself; Laravel 12 only the older "could not connect to server" wording.
+        'failed: Connection refused',
         'failed: No route to host',
         'failed: Network is unreachable',
         '[2002] No route to host',

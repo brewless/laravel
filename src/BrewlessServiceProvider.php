@@ -23,6 +23,7 @@ use Brewless\Laravel\Queue\SignedSqsConnector;
 use Closure;
 use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\Repository;
+use Illuminate\Cache\StorageStore;
 use Illuminate\Contracts\Cache\Factory as CacheFactory;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
@@ -236,7 +237,12 @@ final class BrewlessServiceProvider extends ServiceProvider
         });
 
         // The `storage` cache keeps its values in a bucket; this one takes locks too, on the container's own disk.
+        // Laravel 13 brought that cache; Laravel 12 has no StorageStore, so nothing to extend there.
         $this->app->afterResolving('cache', function (CacheManager $cache): void {
+            if (! class_exists(StorageStore::class)) {
+                return;
+            }
+
             $cache->extend('storage', function (Application $app, array $config): Repository {
                 /** @var CacheManager $this */
                 return $this->repository(new LockingStorageStore(

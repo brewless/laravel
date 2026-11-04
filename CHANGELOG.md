@@ -3,6 +3,14 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.0.1 (4 November 2026)
+
+- Laravel 12 works again; the tests on Laravel 12 had failed since 0.21.0.
+  - A booted application no longer stops on the `storage` cache: Laravel 12 has no `StorageStore`, so the package leaves that driver alone there. On Laravel 13 nothing changes.
+  - The `sqs` queue connection is built on Laravel 12 too: it called `withCredentials()`, which only Laravel 13 has.
+  - A query is tried again on Laravel 12 when PostgreSQL refuses the connection with "failed: Connection refused", as Laravel 13 already counts it as a lost connection.
+- The tests run on PHP 8.3 again.
+
 ## 1.0.0 (4 November 2026)
 
 - First stable release. The package has carried Brewless's own site and its

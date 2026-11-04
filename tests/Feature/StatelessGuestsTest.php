@@ -31,7 +31,8 @@ beforeEach(function (): void {
         });
     }
 
-    config(['session.driver' => 'database', 'session.cookie' => 'shop_session', 'session.lottery' => [100, 100]]);
+    // On, as on Laravel 13 by itself; Laravel 12 needs it said (the test of the unset setting says null).
+    config(['session.driver' => 'database', 'session.cookie' => 'shop_session', 'session.lottery' => [100, 100], 'brewless.edge.stateless_guests' => true]);
 
     Route::middleware('web')->group(function (): void {
         Route::get('/pricing', fn (): string => 'the same for everybody');
