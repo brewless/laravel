@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Brewless\Laravel\Ops;
 
+use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
 use Brewless\Laravel\Queue\JobSignature;
 use Brewless\Laravel\Queue\TriggeredJob;
 use DateTimeZone;
@@ -213,6 +214,13 @@ final class Runtime
      * How the schedule and the queue are doing. Which jobs failed, not why:
      * an exception can quote the data it failed on.
      *
+     * `edge_secrets` says how many edge secrets this container holds, never
+     * which: one normally, two while Brewless is replacing it. Brewless reads
+     * it to see that a container really took the second one before it points
+     * the edge at the new secret. A container of an older version of this
+     * package leaves the key out, which is how Brewless knows it cannot
+     * replace the secret there without a gap.
+     *
      * @return array<string, mixed>
      */
     public function status(): array
@@ -250,6 +258,7 @@ final class Runtime
             'jobs_failed' => $failedCount ?? 0,
             'failed' => $failed,
             'schedule' => $this->scheduledMoments(),
+            'edge_secrets' => count(TrustEdgeHost::secrets()),
             'now' => now()->toIso8601String(),
         ];
     }

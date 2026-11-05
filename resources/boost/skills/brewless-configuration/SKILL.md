@@ -44,7 +44,7 @@ A name that looks like a secret is refused here: one with `KEY`, `SECRET`, `PASS
 
 Do not set these by hand; Brewless writes them on every deploy:
 - `BREWLESS_OPS_SECRET` (release and worker containers only)
-- `BREWLESS_EDGE_SECRET`
+- `BREWLESS_EDGE_SECRET`, and `BREWLESS_EDGE_SECRET_PREVIOUS` for as long as a replacement takes
 - `BREWLESS_DOMAINS`
 - `RELEASE`
 - with a cache: `BREWLESS_REDIS_CA`, `REDIS_*`

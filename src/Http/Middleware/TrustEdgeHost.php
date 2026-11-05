@@ -17,6 +17,14 @@ use Symfony\Component\HttpFoundation\Response;
  * edge secret, and only for the application's own domains and their
  * subdomains. Anything else keeps the Host it arrived with.
  *
+ * While that secret is being replaced the container holds two: the one in
+ * force and the one before it (`BREWLESS_EDGE_SECRET_PREVIOUS`). Both are
+ * believed, so the edge and the container never have to change in the same
+ * instant — whichever of the two the edge is sending, the hostname is put
+ * back. The one before it is taken away again once the edge sends the new
+ * one, and holding two is a state that lasts minutes, not a setting to leave
+ * standing.
+ *
  * The visitor's address travels in X-Forwarded-For, to which every proxy on
  * the way appends what it saw. A visitor can put anything in front of that,
  * so only the last entries count: as many as there are proxies
@@ -42,16 +50,16 @@ final class TrustEdgeHost
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $secret = config('brewless.edge.secret');
+        $secrets = self::secrets();
 
-        if (! is_string($secret) || $secret === '') {
+        if ($secrets === []) {
             $this->keepOnly($request, $this->visitorAddress($request));
 
             return $next($request);
         }
 
         $given = $request->headers->get((string) config('brewless.edge.secret_header'));
-        $fromEdge = is_string($given) && hash_equals($secret, $given);
+        $fromEdge = is_string($given) && self::accepted($secrets, $given);
         $host = $fromEdge ? $this->edgeHost($request) : null;
 
         if ($host !== null) {
@@ -70,6 +78,47 @@ final class TrustEdgeHost
         $request->headers->remove((string) config('brewless.edge.secret_header'));
 
         return $next($request);
+    }
+
+    /**
+     * The secrets a request from the edge may carry: the one in force, and
+     * the one before it while it is being replaced. The same value given
+     * twice counts once.
+     *
+     * Public because it is also what the application reports about itself
+     * (`Ops\Runtime::status()`): how many it holds, never which.
+     *
+     * @return list<string>
+     */
+    public static function secrets(): array
+    {
+        $secrets = [];
+
+        foreach ([config('brewless.edge.secret'), config('brewless.edge.previous_secret')] as $secret) {
+            if (is_string($secret) && $secret !== '') {
+                $secrets[] = $secret;
+            }
+        }
+
+        return array_values(array_unique($secrets));
+    }
+
+    /**
+     * Whether what the request carries is one of them. Every secret is
+     * compared and none cuts the loop short, so the answer costs the same
+     * work whichever one matched.
+     *
+     * @param  list<string>  $secrets
+     */
+    private static function accepted(array $secrets, string $given): bool
+    {
+        $accepted = false;
+
+        foreach ($secrets as $secret) {
+            $accepted = hash_equals($secret, $given) || $accepted;
+        }
+
+        return $accepted;
     }
 
     /** X-Forwarded-For as only this address, or without it. */

@@ -75,3 +75,13 @@ brewless dns:add example.eu TXT _verify "value" --ttl=300
 - Adding a domain can move its visitors, and DNS changes are live for everyone: **ask first**.
 - Every environment also has a test address `<organisation>-<application>-<environment>.brewless.dev`. It is marked `noindex`.
 - `domains` in `brewless.yml` lists the domains an environment should answer on. A deploy names the missing ones and adds them after a yes, or with `--domains`.
+
+## The edge secret
+
+With that secret the edge proves to the containers that a request came through it; without it they believe neither the hostname of the visitor nor their address. Brewless makes it, keeps it in the customer's Secret Manager and never shows it. Replace it only when the user asks, and only because it may have been seen by someone it should not have been:
+
+```bash
+brewless edge:rotate-secret production
+```
+
+It takes two releases of the image that is live (nothing is built, nothing is rolled back) because the containers hold the new secret and the one before it until the edge has moved over; the site keeps answering throughout, and each release empties the edge cache. It needs `brewless/laravel` 1.2 or later, variables kept through Brewless, and a worker or release container; otherwise the command says so and changes nothing.

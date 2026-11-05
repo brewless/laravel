@@ -19,6 +19,7 @@ const GUIDELINES_PATH = __DIR__.'/../../resources/boost/guidelines';
 const CLI_COMMANDS = [
     'login', 'logout', 'init', 'deploy', 'plan', 'service:push', 'releases', 'rollback', 'env:pull', 'env:push',
     'provision', 'domain:add', 'dns:list', 'dns:add', 'dns:update', 'dns:remove', 'scale', 'command', 'logs', 'export', 'detach',
+    'edge:rotate-secret',
 ];
 
 /**
@@ -63,7 +64,8 @@ test('every skill follows the Agent Skills format', function (string $directory)
 })->with(skillDirectories());
 
 test('a skill or the guideline names only commands the brewless client has', function (string $file): void {
-    preg_match_all('/\bbrewless ([a-z]+(?::[a-z]+)?)\b/', (string) file_get_contents($file), $matches);
+    // A command is a word, or words joined by a colon or a hyphen: `env:push`, `edge:rotate-secret`.
+    preg_match_all('/\bbrewless ([a-z]+(?:[:-][a-z]+)*)\b/', (string) file_get_contents($file), $matches);
 
     $unknown = array_values(array_diff(array_unique($matches[1]), CLI_COMMANDS, ['laravel', 'cli']));
 

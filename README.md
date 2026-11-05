@@ -103,6 +103,14 @@ A request with the secret is also marked as HTTPS: the edge forces HTTPS for
 every visitor, so the URLs Laravel generates (assets, links, redirects) start
 with `https://` without trusting a proxy in `TrustProxies`.
 
+Brewless can replace that secret without a moment in which the edge and the
+container disagree. It hands the container the new secret together with the
+one before it in `BREWLESS_EDGE_SECRET_PREVIOUS`, both of which count in
+full, then points the edge at the new one and takes the old one away again.
+Nothing to set yourself: a container that holds two does so for the minutes
+the replacement takes. `GET /_ops/status` reports under `edge_secrets` how
+many it holds, never which.
+
 The visitor's address is treated the same way. With an edge secret set, only
 the entry the edge appended to `X-Forwarded-For` is kept, and a request
 without the secret loses the header, so rate limits count the real visitor
@@ -535,6 +543,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_OPS_SECRET` | Turns the ops routes on, on this container |
 | `SCHEDULE_TIMEZONE` | The time zone of the schedule (`Europe/Amsterdam`), unless the application sets `app.schedule_timezone` itself |
 | `BREWLESS_EDGE_SECRET` | The secret the edge adds to every request |
+| `BREWLESS_EDGE_SECRET_PREVIOUS` | The secret before it, while Brewless replaces it; counts in full and is taken away again |
 | `BREWLESS_DOMAINS` | Comma-separated domains that are yours |
 | `BREWLESS_EDGE_HOPS` | Proxies between the visitor and the container (`1`) |
 | `BREWLESS_EDGE_CACHE` | Seconds the edge keeps an answer that is the same for everybody (`3600`); `0` keeps nothing |
