@@ -4,7 +4,7 @@ This application is deployed with [Brewless](https://brewless.eu): serverless co
 
 ### Rules
 
-- **Ask before anything that changes an environment.** Never run `brewless deploy`, `rollback`, `env:push`, `scale`, `provision`, `domain:add`, `dns:add`, `dns:update`, `dns:remove`, `service:push` or `detach`, or `brewless command` on production, unless the user asked for that action on that environment. `brewless plan`, `releases`, `logs` and `env:pull` only read.
+- **Ask before anything that changes an environment.** Never run `brewless deploy`, `rollback`, `env:push`, `scale`, `provision`, `domain:add`, `dns:add`, `dns:update`, `dns:remove`, `service:push`, `edge:rotate-secret` or `detach`, or `brewless command` on production, unless the user asked for that action on that environment. `brewless plan`, `releases`, `logs` and `env:pull` only read.
 - **Never pass `--force`** to skip a confirmation the user has not given.
 - **Never put a secret in `brewless.yml` or in the repository.** Plain values go under `variables` in `brewless.yml`. Secrets go into the environment's own Secret Manager with `brewless env:push`. Brewless refuses a name in `brewless.yml` that looks like a secret.
 - **The containers are serverless.** Nothing stays running. The local disk does not outlive the container, and is not shared between replicas. Keep uploads in a bucket (`storage` in `brewless.yml`), sessions and cache in the database or the cache, and never rely on a file written in an earlier request.
