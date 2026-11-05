@@ -32,10 +32,11 @@ use Symfony\Component\HttpFoundation\Response;
  * collected only when a session is kept: with sessions in a database, a
  * guest on a public page does not wake it.
  *
- * - the answer is no empty answer or JSON: those (Sanctum's
- *   `/sanctum/csrf-cookie`, for one) are asked for to get those cookies. An
- *   HTML page goes without them, and so does a text file such as llms.txt,
- *   a sitemap or a page as markdown.
+ * - the answer is no empty answer, and no JSON a script asked for: those
+ *   (Sanctum's `/sanctum/csrf-cookie`, for one) are asked for to get those
+ *   cookies. An HTML page goes without them, and so does a text file such as
+ *   llms.txt, a sitemap or a page as markdown, and so does JSON the browser
+ *   or a crawler fetched by itself.
  *
  * Anything else keeps its session exactly as before: a form, a page that put
  * something in the session (an intended URL, a flash message), a streamed
@@ -168,22 +169,67 @@ final class StartSessionWhenNeeded extends StartSession
 
     /**
      * Whether the answer is what a script asks for to get the session and
-     * XSRF-TOKEN cookies: an empty answer or JSON (Sanctum's
-     * `/sanctum/csrf-cookie`, for one). Any other answer, an HTML page or a
-     * text file such as llms.txt, a sitemap or a page as markdown, is read
-     * for its content: with a cookie the edge never keeps it, and every
-     * visit wakes the container (seen on coding.agency, 3 November 2026).
+     * XSRF-TOKEN cookies: an empty answer (Sanctum's `/sanctum/csrf-cookie`,
+     * for one), or JSON the request itself shows a script fetched. Any other
+     * answer, an HTML page or a text file such as llms.txt, a sitemap or a
+     * page as markdown, is read for its content: with a cookie the edge never
+     * keeps it, and every visit wakes the container (seen on coding.agency,
+     * 3 November 2026).
+     *
+     * JSON used to count on its content type alone, and that is too much: the
+     * type says what came back, never who asked for it. Measured on
+     * coding.agency, 5 November 2026, five answers kept a session for nothing
+     * on that rule — `/site.webmanifest`, which the browser fetches itself,
+     * and `/.well-known/mcp.json`, `/.well-known/mcp/server-card.json`,
+     * `/.well-known/ai-catalog.json` and `/.well-known/agent-card.json`,
+     * which crawlers fetch. None of them has a cookie to use, and the cookie
+     * on the answer kept all five out of the edge, so each one woke the
+     * container on every visit.
      */
     private function askedForCookies(Request $request, Response $response): bool
     {
-        $type = strtolower((string) $response->headers->get('Content-Type'));
-
         // A HEAD has no body by nature: only its type says what it is.
         $empty = $response->getStatusCode() === 204 || ($response->getContent() === '' && ! $request->isMethod('HEAD'));
 
-        return $empty
-            || str_starts_with($type, 'application/json')
+        return $empty || ($this->json($response) && $this->fetchedByScript($request));
+    }
+
+    /** Whether the answer is JSON, in any of its flavours (`application/ld+json`, `application/manifest+json`). */
+    private function json(Response $response): bool
+    {
+        $type = strtolower((string) $response->headers->get('Content-Type'));
+
+        return str_starts_with($type, 'application/json')
             || preg_match('#^application/[^;]+\+json#', $type) === 1;
+    }
+
+    /**
+     * Whether a script in a page made this request, by any of the three
+     * signals the browser or the client sends of its own accord.
+     *
+     * `X-Requested-With: XMLHttpRequest` is Laravel's own convention and what
+     * Axios sends, so it is on Sanctum's `/sanctum/csrf-cookie`. An `Accept`
+     * that names JSON ahead of anything else is what
+     * `fetch(url, { headers: { Accept: 'application/json' } })` sends, which
+     * is how coding-agency's ROI modal asks its `/csrf-token` route for a
+     * token. `Sec-Fetch-Dest: empty` is what fetch() and XHR send, where a
+     * manifest is fetched with `manifest` and a navigation with `document`.
+     *
+     * An `Accept` of anything at all is deliberately not a signal: that is
+     * what the browser sends for a manifest, what a crawler sends for a
+     * `.well-known` file, and what curl sends for everything.
+     *
+     * `expectsJson()` is nearly this and was not used: it holds the XHR marker
+     * against the `Accept` beside it (`acceptsAnyContentType()`), so a script
+     * that sends the marker with an `Accept` naming HTML first falls through
+     * it. That marker is the one signal nothing but a script sets, so it
+     * counts here on its own.
+     */
+    private function fetchedByScript(Request $request): bool
+    {
+        return $request->ajax()
+            || $request->wantsJson()
+            || strtolower(trim((string) $request->headers->get('Sec-Fetch-Dest'))) === 'empty';
     }
 
     /**

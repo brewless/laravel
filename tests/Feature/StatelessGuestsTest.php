@@ -180,15 +180,10 @@ test('a kept session still collects its garbage', function (): void {
     expect(implode("\n", $queries))->toContain('delete');
 });
 
-test('an empty answer or JSON keeps its cookies: a script asks for them (Sanctum\'s csrf-cookie)', function (): void {
+test('an empty answer keeps its cookies: nothing else is asked for (Sanctum\'s csrf-cookie)', function (): void {
     Route::middleware('web')->get('/csrf-cookie', fn () => response()->noContent());
-    Route::middleware('web')->get('/json', fn () => response()->json(['ok' => true]));
 
-    foreach (['/csrf-cookie', '/json'] as $path) {
-        $names = array_map(static fn ($cookie): string => $cookie->getName(), $this->get($path)->headers->getCookies());
-
-        expect($names)->toContain('shop_session');
-    }
+    expect(cookieNames($this->get('/csrf-cookie')))->toContain('shop_session');
 });
 
 test('a text answer that is not HTML goes without a session too, so the edge may keep it (llms.txt, a sitemap, markdown)', function (string $type): void {
@@ -213,6 +208,74 @@ test('unset, it follows the CSRF check: on where a same-origin request needs no 
 
     config(['brewless.edge.stateless_guests' => true]);
     expect(StartSessionWhenNeeded::enabled())->toBeTrue();
+});
+
+/*
+ | JSON counts as asked for only when the request shows a script asked (BL-258).
+ |
+ | The content type says what came back, never who fetched it. On coding.agency
+ | a webmanifest and four `.well-known` files kept a session on their type
+ | alone, so the edge could keep none of them and each woke the container on
+ | every visit.
+ */
+
+test('JSON keeps its cookies when the request shows a script fetched it', function (array $headers): void {
+    Route::middleware('web')->get('/csrf-cookie.json', fn () => response()->json(['ok' => true]));
+
+    $answer = $this->withHeaders($headers)->get('/csrf-cookie.json');
+
+    expect(cookieNames($answer))->toContain('shop_session')
+        ->and(cookieNames($answer))->toContain('XSRF-TOKEN')
+        ->and($answer->headers->get('Cache-Control'))->not->toBe(GUEST_PAGE_CACHE);
+})->with([
+    'Axios, as Sanctum is fetched' => [['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'application/json, text/plain, */*']],
+    // Only a script sets the marker, so it counts on its own, where expectsJson() would drop it again.
+    'the XHR marker, whatever it accepts' => [['X-Requested-With' => 'XMLHttpRequest', 'Accept' => 'text/html']],
+    'fetch() asking for JSON, as the ROI modal does' => [['Accept' => 'application/json', 'Sec-Fetch-Dest' => 'empty', 'Sec-Fetch-Mode' => 'cors']],
+    'the same fetch() with no Sec-Fetch headers' => [['Accept' => 'application/json']],
+    'fetch() that accepts anything' => [['Accept' => '*/*', 'Sec-Fetch-Dest' => 'empty']],
+]);
+
+test('a JSON flavour a script fetched keeps its cookies too', function (): void {
+    Route::middleware('web')->get('/person', fn () => response('{"@type":"Person"}', 200, ['Content-Type' => 'application/ld+json']));
+
+    $answer = $this->withHeaders(['Accept' => 'application/ld+json', 'Sec-Fetch-Dest' => 'empty'])->get('/person');
+
+    expect(cookieNames($answer))->toContain('shop_session');
+});
+
+test('JSON nobody fetched as a script goes to the edge instead', function (array $headers): void {
+    Route::middleware('web')->get('/.well-known/ai-catalog.json', fn () => response()->json(['name' => 'Shop']));
+
+    $answer = $this->withHeaders($headers)->get('/.well-known/ai-catalog.json');
+
+    expect(cookieNames($answer))->toBe([])
+        ->and($answer->headers->get('Cache-Control'))->toBe(GUEST_PAGE_CACHE)
+        ->and(DB::table('sessions')->count())->toBe(0);
+})->with([
+    'a crawler, no Sec-Fetch headers' => [['Accept' => '*/*']],
+    'curl' => [['Accept' => '*/*', 'User-Agent' => 'curl/8.7.1']],
+    'nothing said at all' => [[]],
+    'a browser navigating to it' => [[
+        'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Sec-Fetch-Dest' => 'document',
+        'Sec-Fetch-Mode' => 'navigate',
+    ]],
+]);
+
+test('a webmanifest the browser fetches itself goes to the edge, though its type ends in +json', function (): void {
+    Route::middleware('web')->get('/site.webmanifest', fn () => response('{"name":"Shop"}', 200, ['Content-Type' => 'application/manifest+json']));
+
+    $answer = $this->withHeaders(['Accept' => '*/*', 'Sec-Fetch-Dest' => 'manifest', 'Sec-Fetch-Mode' => 'cors'])->get('/site.webmanifest');
+
+    expect(cookieNames($answer))->toBe([])
+        ->and($answer->headers->get('Cache-Control'))->toBe(GUEST_PAGE_CACHE);
+});
+
+test('JSON that carries the CSRF token keeps its session, whoever fetched it', function (): void {
+    Route::middleware('web')->get('/token.json', fn () => response()->json(['token' => csrf_token()]));
+
+    expect(cookieNames($this->withHeaders(['Accept' => '*/*'])->get('/token.json')))->toContain('shop_session');
 });
 
 /*

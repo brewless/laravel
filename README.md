@@ -161,8 +161,18 @@ message, an intended URL), a streamed answer and every visitor who sent a
 cookie keep their session exactly as before. With sessions in a database, a
 guest on a public page does not touch it either: the session of a request
 without a session cookie is started without a read, and garbage is collected
-only when a session is kept. Only an HTML page counts: an empty answer or JSON
-(Sanctum's `/sanctum/csrf-cookie`) is asked for to get those cookies.
+only when a session is kept.
+
+Two answers are asked for to get those cookies, and keep them: an empty one
+(Sanctum's `/sanctum/csrf-cookie`), and JSON that a script in a page fetched.
+The request has to show that, by one of `X-Requested-With: XMLHttpRequest`
+(what Axios and Sanctum send), an `Accept` that names JSON ahead of anything
+else (what `fetch(url, { headers: { Accept: 'application/json' } })` sends), or
+`Sec-Fetch-Dest: empty` (what fetch() and XHR are given). JSON fetched without
+any of those is kept at the edge like any other page: a `site.webmanifest` the
+browser fetches itself and a `.well-known` file a crawler reads have no cookie
+to use. If a script of yours asks a route for its token, let it send one of the
+three; Axios does by itself.
 
 A page whose script posts later without the token in its HTML (Inertia, the
 sign-in screen of a Vue app) relies on the `XSRF-TOKEN` cookie. Laravel 13's

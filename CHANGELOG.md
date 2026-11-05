@@ -3,6 +3,26 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.4.0 (5 November 2026)
+
+- **A JSON answer keeps its session only when the request shows a script fetched it.** Every
+  `application/json` and `application/…+json` answer counted as something a script asked for to get the
+  session and `XSRF-TOKEN` cookies, and the content type says what came back, never who asked. On
+  coding.agency that held five answers out of the edge for nothing — `/site.webmanifest`, which the
+  browser fetches itself, and `/.well-known/mcp.json`,
+  `/.well-known/mcp/server-card.json`, `/.well-known/ai-catalog.json` and `/.well-known/agent-card.json`,
+  which crawlers read — so each of them woke the container on every visit. The request now has to show
+  it: `X-Requested-With: XMLHttpRequest` (Axios, and so Sanctum's `/sanctum/csrf-cookie`), an `Accept`
+  that names JSON ahead of anything else (`fetch(url, { headers: { Accept: 'application/json' } })`), or
+  `Sec-Fetch-Dest: empty` (what fetch() and XHR send, where a manifest sends `manifest` and a navigation
+  `document`). An empty answer still keeps its cookies on its own.
+
+  > **This changes what the edge keeps.** A JSON route whose script sends none of the three loses its
+  > session cookie and goes to the edge, and a script that counted on the `XSRF-TOKEN` cookie from it
+  > then posts without one. Axios sends the marker by itself, and a browser's `fetch()` sends
+  > `Sec-Fetch-Dest: empty` by itself; a client of your own needs `Accept: application/json` on the
+  > request. Run `php artisan brewless:sleep` to see which answers changed sides.
+
 ## 1.3.0 (5 November 2026)
 
 - **A page that shows a CSRF token keeps its session again when the body was compressed first.** The check
