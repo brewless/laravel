@@ -3,7 +3,7 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
-## Unreleased
+## 1.1.0 (5 November 2026)
 
 - `php artisan brewless:sleep` says what keeps the container awake. It asks every public page through the
   application's own middleware, without cookies, and holds the answer against the rules of `CacheAtEdge`:
