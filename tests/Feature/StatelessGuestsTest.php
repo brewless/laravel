@@ -7,6 +7,7 @@ use Brewless\Laravel\Http\Middleware\StartSessionWhenNeeded;
 use Brewless\Laravel\Tests\TestCase;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Symfony\Component\HttpFoundation\Response;
 
 uses(TestCase::class);
 
@@ -212,3 +214,72 @@ test('unset, it follows the CSRF check: on where a same-origin request needs no 
     config(['brewless.edge.stateless_guests' => true]);
     expect(StartSessionWhenNeeded::enabled())->toBeTrue();
 });
+
+/*
+ | A body another middleware already worked on (BL-254).
+ |
+ | Middleware an application appends to its `web` group runs deeper than
+ | StartSessionWhenNeeded, so compression is done before this one looks. On
+ | coding.agency that hid the CSRF token from the check, and every page went to
+ | the edge with a token belonging to a session nobody kept.
+ */
+
+test('a page that shows its token keeps its session, also when the body was compressed first', function (string $middleware): void {
+    Route::middleware(['web', $middleware])->get('/compressed-form', fn (): string => '<form><input name="_token" value="'.csrf_token().'"></form>');
+
+    $answer = $this->get('/compressed-form');
+
+    expect($answer->headers->getCookies())->not->toBeEmpty()
+        ->and($answer->headers->get('Cache-Control'))->not->toBe(GUEST_PAGE_CACHE);
+})->with([Gzips::class, Deflates::class]);
+
+test('a compressed page that shows no token still loses its session', function (): void {
+    Route::middleware(['web', Gzips::class])->get('/compressed-page', fn (): string => 'the same for everybody');
+
+    $this->get('/compressed-page')->assertHeader('Cache-Control', GUEST_PAGE_CACHE);
+});
+
+test('an encoding that cannot be undone keeps the session, rather than guessing', function (): void {
+    Route::middleware(['web', SaysSomethingElse::class])->get('/unknown-encoding', fn (): string => 'the same for everybody');
+
+    $answer = $this->get('/unknown-encoding');
+
+    expect($answer->headers->getCookies())->not->toBeEmpty()
+        ->and($answer->headers->get('Cache-Control'))->not->toBe(GUEST_PAGE_CACHE);
+});
+
+/** Compression of an application's own, appended to its web group and so deeper than the session middleware. */
+final class Gzips
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        $response = $next($request);
+        $response->setContent((string) gzencode((string) $response->getContent()));
+        $response->headers->set('Content-Encoding', 'gzip');
+
+        return $response;
+    }
+}
+
+final class Deflates
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        $response = $next($request);
+        $response->setContent((string) gzcompress((string) $response->getContent()));
+        $response->headers->set('Content-Encoding', 'deflate');
+
+        return $response;
+    }
+}
+
+final class SaysSomethingElse
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        $response = $next($request);
+        $response->headers->set('Content-Encoding', 'something-else');
+
+        return $response;
+    }
+}

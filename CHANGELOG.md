@@ -3,6 +3,21 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.3.0 (5 November 2026)
+
+- **A page that shows a CSRF token keeps its session again when the body was compressed first.** The check
+  read the raw body for the token, and compression an application appends to its `web` group runs deeper
+  than this middleware, so the token was already gzipped and never found. Such a page then went to the
+  edge with a token belonging to a session nobody kept. The body is now read as the visitor reads it
+  (gzip and deflate are undone, brotli where PHP can); an encoding that cannot be undone keeps the
+  session rather than guess.
+
+  > **This changes what the edge keeps.** A site whose pages show a CSRF token everywhere — a
+  > `<meta name="csrf-token">` in the layout puts one on every page — and that compresses its answers was
+  > having those pages kept at the edge by accident. After this they keep their session and the edge
+  > stops keeping them, which is what the rule always meant. Take the token off the pages that have no
+  > form, and run `php artisan brewless:sleep` to see which pages those are.
+
 ## 1.2.2 (5 November 2026)
 
 - `brewless:sleep` asks every page on the address the application answers on (`APP_URL`), not on

@@ -190,6 +190,13 @@ That takes `StartSession`, `ShareErrorsFromSession` and the CSRF middleware
 routes, for every visitor, signed in or not. Inside an existing group, such
 as the `web` group of `routes/web.php`, put it inside that group.
 
+A page whose body your own middleware changes — compression, minifying — is
+read back as the visitor reads it before this decides. Compression that the
+application appends to its `web` group runs deeper than the session
+middleware, so without that the token would be hidden from the check and every
+page would go to the edge carrying a token of a session nobody kept. An
+encoding the package cannot undo makes it keep the session rather than guess.
+
 Keep a page out of the edge by setting `Cache-Control` yourself, for instance
 with `->middleware('cache.headers:private')` or `no-store`. Do that for a page
 that depends on something the edge cannot see: the visitor's address, a header

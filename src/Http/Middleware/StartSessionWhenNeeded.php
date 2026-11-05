@@ -123,11 +123,47 @@ final class StartSessionWhenNeeded extends StartSession
             return false;
         }
 
-        $content = $response->getContent();
+        $content = $this->readable($response);
         $token = $session->token();
 
-        // A streamed answer cannot be read back: it keeps its session.
-        return is_string($content) && (! is_string($token) || $token === '' || ! str_contains($content, $token));
+        // An answer that cannot be read back keeps its session.
+        return $content !== null && (! is_string($token) || $token === '' || ! str_contains($content, $token));
+    }
+
+    /**
+     * The body as the visitor reads it, or null when it cannot be read: a
+     * streamed answer, or one in an encoding this cannot undo.
+     *
+     * Middleware the application appends to its `web` group runs deeper than
+     * this one, so its work on the body is already done by the time this looks.
+     * A page whose body was compressed there holds its token just the same,
+     * only not findable, and dropping the session on that is dropping it for
+     * the wrong reason: the page then goes to the edge with a token that
+     * belongs to a session nobody kept (coding.agency, 5 November 2026).
+     */
+    private function readable(Response $response): ?string
+    {
+        $content = $response->getContent();
+
+        if (! is_string($content)) {
+            return null;
+        }
+
+        $encoding = strtolower(trim((string) $response->headers->get('Content-Encoding')));
+
+        if ($encoding === '' || $encoding === 'identity') {
+            return $content;
+        }
+
+        // A body that is not what it says it is only makes these warn; unreadable is the answer either way.
+        $plain = match ($encoding) {
+            'gzip', 'x-gzip' => @gzdecode($content),
+            'deflate' => @gzuncompress($content),
+            'br' => function_exists('brotli_uncompress') ? @brotli_uncompress($content) : false,
+            default => false,
+        };
+
+        return is_string($plain) ? $plain : null;
     }
 
     /**
