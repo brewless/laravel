@@ -82,6 +82,14 @@ return [
     */
     'edge' => [
         'secret' => env('BREWLESS_EDGE_SECRET'),
+
+        // The secret before this one, which counts just as much. Brewless
+        // sets it while it replaces the secret and takes it away again right
+        // after: the edge and the container cannot change in the same
+        // instant, and for the minutes in between the container answers to
+        // both. Nothing to set by hand, and nothing to leave standing.
+        'previous_secret' => env('BREWLESS_EDGE_SECRET_PREVIOUS'),
+
         'secret_header' => 'X-Brewless-Edge',
         'host_header' => 'Cdn-Host',
 

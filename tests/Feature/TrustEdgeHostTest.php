@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
 use Brewless\Laravel\Tests\TestCase;
 
 uses(TestCase::class);
@@ -68,4 +69,71 @@ test('an application without an edge keeps the address its provider appended, an
     // A visitor who writes an address of their choosing in front gets the one the provider saw.
     $this->get('/address', ['X-Forwarded-For' => '1.2.3.4, 203.0.113.7'])->assertSee('forwarded:203.0.113.7');
     $this->get('/address', ['X-Forwarded-For' => 'not-an-address'])->assertDontSee('not-an-address');
+});
+
+/*
+ * Replacing the edge secret (BL-249). The edge and the container cannot change
+ * in the same instant, so for the minutes in between the container holds two
+ * secrets and answers to either. What matters here is that the second one is a
+ * secret like the first — it puts the hostname back, marks the request secure
+ * and lets the visitor's address through — and that holding two widens nothing
+ * else.
+ *
+ * Every request names its host in full (`http://localhost/host`). A relative
+ * path is turned into a URL with `url()`, which answers with the host of the
+ * last request that was believed, so a test that asks for `/host` twice would
+ * assert the second time against a host it set itself.
+ */
+test('while the secret is being replaced the one before it counts just as much', function (string $secret): void {
+    config(['brewless.edge.secret' => 'the-new-one', 'brewless.edge.previous_secret' => TestCase::EDGE_SECRET]);
+
+    $this->get('http://localhost/host', ['X-Brewless-Edge' => $secret, 'Cdn-Host' => 'www.shop.example'])
+        ->assertOk()
+        ->assertSee('www.shop.example|secret-gone');
+
+    $this->get('http://localhost/url', ['X-Brewless-Edge' => $secret, 'Cdn-Host' => 'www.shop.example'])
+        ->assertSee('https://www.shop.example/build/app.css|secure');
+
+    $this->get('http://localhost/address', ['X-Brewless-Edge' => $secret, 'X-Forwarded-For' => '203.0.113.7'])
+        ->assertSee('forwarded:203.0.113.7');
+})->with([
+    'the one in force' => ['the-new-one'],
+    'the one before it' => [TestCase::EDGE_SECRET],
+]);
+
+test('holding two secrets widens nothing: a third guess is still nobody', function (): void {
+    config(['brewless.edge.secret' => 'the-new-one', 'brewless.edge.previous_secret' => TestCase::EDGE_SECRET]);
+
+    $this->get('http://localhost/host', ['X-Brewless-Edge' => 'guess', 'Cdn-Host' => 'www.shop.example'])->assertSee('localhost|secret-gone');
+    $this->get('http://localhost/address', ['X-Brewless-Edge' => 'guess', 'X-Forwarded-For' => '203.0.113.7'])->assertSee('forwarded:nothing');
+});
+
+test('holding two secrets does not widen whose hostnames may be named', function (): void {
+    config(['brewless.edge.secret' => 'the-new-one', 'brewless.edge.previous_secret' => TestCase::EDGE_SECRET]);
+
+    $this->get('http://localhost/host', ['X-Brewless-Edge' => TestCase::EDGE_SECRET, 'Cdn-Host' => 'evil.example'])->assertSee('localhost|');
+});
+
+test('an empty secret is no secret, so it opens nothing', function (mixed $previous): void {
+    config(['brewless.edge.secret' => 'the-new-one', 'brewless.edge.previous_secret' => $previous]);
+
+    $this->get('http://localhost/host', ['X-Brewless-Edge' => '', 'Cdn-Host' => 'www.shop.example'])->assertSee('localhost|secret-gone');
+    $this->get('http://localhost/host', ['X-Brewless-Edge' => 'the-new-one', 'Cdn-Host' => 'www.shop.example'])->assertSee('www.shop.example|secret-gone');
+})->with(['empty' => [''], 'unset' => [null]]);
+
+test('the two are equals: one before it and nothing in force is believed, and a guess still is not', function (): void {
+    config(['brewless.edge.secret' => null, 'brewless.edge.previous_secret' => TestCase::EDGE_SECRET]);
+
+    $this->get('http://localhost/host', ['X-Brewless-Edge' => 'guess', 'Cdn-Host' => 'www.shop.example'])->assertSee('localhost|secret-gone');
+    $this->get('http://localhost/host', ['X-Brewless-Edge' => TestCase::EDGE_SECRET, 'Cdn-Host' => 'www.shop.example'])->assertSee('www.shop.example|secret-gone');
+});
+
+test('the same secret given twice is one secret, and no secret at all is none', function (): void {
+    config(['brewless.edge.previous_secret' => TestCase::EDGE_SECRET]);
+
+    expect(TrustEdgeHost::secrets())->toBe([TestCase::EDGE_SECRET]);
+
+    config(['brewless.edge.secret' => null, 'brewless.edge.previous_secret' => null]);
+
+    expect(TrustEdgeHost::secrets())->toBe([]);
 });

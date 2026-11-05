@@ -128,7 +128,8 @@ test('the status says how the schedule and the queue are doing, and which jobs f
         ->assertJsonPath('jobs_failed', 1)
         ->assertJsonPath('failed.0.id', $uuid)
         ->assertJsonPath('failed.0.name', 'App\Jobs\ChargeCard')
-        ->assertJsonPath('schedule_heartbeat', null);
+        ->assertJsonPath('schedule_heartbeat', null)
+        ->assertJsonPath('edge_secrets', 1);
 
     expect($response->getContent())->not->toContain('4111')->not->toContain('do-not-show');
 });
@@ -296,4 +297,12 @@ test('a tick works only the queues it names, the first first', function (): void
 
     $this->postJson('/', ['secret' => TestCase::OPS_SECRET, 'task' => 'tick', 'queues' => 'mail'])->assertUnprocessable();
     $this->postJson('/', ['secret' => TestCase::OPS_SECRET, 'task' => 'queue', 'queues' => ['bad name']])->assertUnprocessable();
+});
+
+test('the status says how many edge secrets the container holds, never which', function (): void {
+    config(['brewless.edge.previous_secret' => 'the-one-before']);
+
+    $response = $this->getJson('/_ops/status', $this->ops())->assertOk()->assertJsonPath('edge_secrets', 2);
+
+    expect($response->getContent())->not->toContain('the-one-before')->not->toContain(TestCase::EDGE_SECRET);
 });
