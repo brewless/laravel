@@ -187,6 +187,33 @@ with `->middleware('cache.headers:private')` or `no-store`. Do that for a page
 that depends on something the edge cannot see: the visitor's address, a header
 of your own, or the `Accept` header (the edge keeps one answer per address).
 
+### What keeps the container awake
+
+```bash
+php artisan brewless:sleep
+```
+
+Every public page is asked through the application's own middleware, without
+cookies, as a first visitor asks it, and the answer is held against the rules
+above. What comes back is the page, and the rule it failed: it keeps a
+session, it sets a `Cache-Control` of its own, it sets a cookie, the answer is
+a 302, it varies on a header, or it looked at who is signed in. Next to that:
+the files your pages name without a `?v=`, which the edge fetches from the
+container instead of the storage zone, and the scheduled work that repeats
+within the hour and wakes the worker that often.
+
+Nothing leaves the machine and no container is woken by it. `--path=/pricing`
+limits it to the pages you name, and `--strict` makes it fail when a page
+cannot be kept, for a hook or a pipeline.
+
+A page can answer differently on a developer machine than it does live, and
+only the live answer decides what the edge keeps, so the command says which
+environment answered. For the answer that counts:
+
+```bash
+brewless command production "brewless:sleep"
+```
+
 ### The test address
 
 Brewless gives every environment a test address, such as
@@ -477,6 +504,7 @@ With [Laravel Boost](https://laravel.com/docs/boost) there is nothing to do. Run
 | `brewless-configuration` | `resources/boost/skills/` | Variables and secrets, `brewless.yml`, container sizes, PHP version, `docker/` server files |
 | `brewless-operations` | `resources/boost/skills/` | Logs, running a command, queues and the schedule, scaling, domains and DNS |
 | `brewless-databases` | `resources/boost/skills/` | Databases, migrations, queues, buckets, backups, the cache, and a database per tenant |
+| `brewless-sleep` | `resources/boost/skills/` | Why a container never sleeps, what `brewless:sleep` reports, and what to do about each finding |
 
 The guideline goes into your `AGENTS.md` or `CLAUDE.md`. The skills go into `.agents/skills`, `.claude/skills`, `.cursor/skills` and so on, one folder per agent. A skill is loaded only when the task calls for it.
 

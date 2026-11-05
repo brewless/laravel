@@ -3,6 +3,15 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## Unreleased
+
+- `php artisan brewless:sleep` says what keeps the container awake. It asks every public page through the
+  application's own middleware, without cookies, and holds the answer against the rules of `CacheAtEdge`:
+  per page the rule it failed, plus the files the pages name without a `?v=` and the scheduled work that
+  repeats within the hour. `--path=` limits it, `--strict` fails on a page that cannot be kept. It says
+  which environment answered, because only the live answer decides what the edge keeps.
+- A `brewless-sleep` skill for coding agents, and the guideline names the command.
+
 ## 1.0.1 (4 November 2026)
 
 - Laravel 12 works again; the tests on Laravel 12 had failed since 0.21.0.

@@ -7,6 +7,7 @@ namespace Brewless\Laravel;
 use Brewless\Laravel\Cache\LockingStorageStore;
 use Brewless\Laravel\Capacity\CapacityApi;
 use Brewless\Laravel\Capacity\CapacityClient;
+use Brewless\Laravel\Console\SleepCommand;
 use Brewless\Laravel\Database\MySqlConnection;
 use Brewless\Laravel\Database\PostgresConnection;
 use Brewless\Laravel\Databases\DatabaseClient;
@@ -220,6 +221,10 @@ final class BrewlessServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->publishes([__DIR__.'/../config/brewless.php' => config_path('brewless.php')], 'brewless-config');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([SleepCommand::class]);
+        }
 
         // The agent skills of resources/boost/skills, for a project without Laravel Boost (which finds them
         // by itself): .agents/skills is read by Codex, Amp, OpenCode, Zed and others, .claude/skills by Claude Code.
