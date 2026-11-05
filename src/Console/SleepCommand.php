@@ -72,6 +72,12 @@ final class SleepCommand extends Command
         return $this->verdict($pages, $seconds);
     }
 
+    /** The address the application answers on, as `APP_URL` says; a page asked anywhere else is another page. */
+    private function base(): string
+    {
+        return rtrim((string) config('app.url'), '/');
+    }
+
     /**
      * The handful of settings that decide most of it, as the container really
      * has them.
@@ -90,7 +96,7 @@ final class SleepCommand extends Command
         );
         $this->components->twoColumnDetail('Sessions in', (string) config('session.driver'));
         $this->components->twoColumnDetail('Queue on', (string) config('queue.default'));
-        $this->components->twoColumnDetail('Asked in', app()->environment());
+        $this->components->twoColumnDetail('Asked in', app()->environment().', on '.$this->base());
 
         // A page can answer differently here than it does live, and only the live answer decides whether the
         // edge keeps it. Seen on a site whose homepage kept a session on a developer machine and not in
@@ -128,7 +134,10 @@ final class SleepCommand extends Command
                 app('auth')->forgetGuards();
             }
 
-            $request = Request::create($path, 'GET', server: ['HTTP_ACCEPT' => 'text/html']);
+            // On the application's own address, not on localhost: the hostname and the scheme decide
+            // what middleware does with a request, and a page asked on the wrong host answers
+            // differently from the one a visitor gets (seen on production, 5 November 2026).
+            $request = Request::create($this->base().$path, 'GET', server: ['HTTP_ACCEPT' => 'text/html']);
 
             try {
                 $response = $kernel->handle($request);

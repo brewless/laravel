@@ -37,6 +37,11 @@ beforeEach(function (): void {
 
         return 'with a session';
     });
+    Route::get('/where', function (): string {
+        config(['test.asked_on' => request()->getSchemeAndHttpHost()]);
+
+        return 'here';
+    });
     Route::get('/logo', fn () => response('<html><body><img src="/img/logo.png"><img src="/img/hero.webp?v=2903919055"></body></html>')->header('Content-Type', 'text/html'));
 });
 
@@ -143,4 +148,14 @@ test('it runs over the ops route, the way brewless command delivers it', functio
     $this->postJson('/_ops/command', ['command' => 'brewless:sleep --path=/page'], ['X-Brewless-Ops' => TestCase::OPS_SECRET])
         ->assertOk()
         ->assertJsonPath('exit_code', 0);
+});
+
+test('a page is asked on the address the application answers on, not on localhost', function (): void {
+    // The hostname and the scheme decide what middleware does with a request, so a page asked on
+    // localhost can answer differently from the one a visitor gets (seen on production, 5 November 2026).
+    config(['app.url' => 'https://shop.example']);
+
+    sleepRun(['/where']);
+
+    expect(config('test.asked_on'))->toBe('https://shop.example');
 });

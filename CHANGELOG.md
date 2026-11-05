@@ -3,6 +3,14 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.2.2 (5 November 2026)
+
+- `brewless:sleep` asks every page on the address the application answers on (`APP_URL`), not on
+  `localhost`. The hostname and the scheme decide what middleware does with a request, and a page asked
+  on the wrong host answers differently from the one a visitor gets. It also made every file a page
+  named on its own domain count as somebody else's, so the files without a `?v=` were undercounted:
+  2 instead of 132 on a site of three pages.
+
 ## 1.2.1 (5 November 2026)
 
 - `brewless:sleep` runs over the ops route again. It was registered behind `runningInConsole()`, which is
