@@ -27,6 +27,31 @@ test('without the edge secret the scheme stays what the container saw', function
     'wrong secret' => [['X-Brewless-Edge' => 'guess', 'Cdn-Host' => 'www.shop.example']],
 ]);
 
+test('on the container\'s own address at Scaleway the request is https, so generated urls are too', function (?string $secret, string $host): void {
+    config(['brewless.edge.secret' => $secret]);
+
+    $this->get('http://'.$host.'/url')->assertSee('https://'.$host.'/build/app.css|secure');
+})->with([
+    'without an edge' => [null],
+    'with an edge, called directly' => [TestCase::EDGE_SECRET],
+])->with([
+    'fr-par' => ['shopa1b2c3d4-web.functions.fnc.fr-par.scw.cloud'],
+    'nl-ams' => ['shopa1b2c3d4-web.functions.fnc.nl-ams.scw.cloud'],
+]);
+
+test('any other host keeps the scheme the container saw, whatever X-Forwarded-Proto says', function (string $host): void {
+    config(['brewless.edge.secret' => null]);
+
+    $this->get('http://'.$host.'/url', ['X-Forwarded-Proto' => 'https'])->assertSee('http://'.$host.'/build/app.css|plain');
+})->with([
+    'local development' => ['shop.test'],
+    'localhost' => ['localhost'],
+    'the functions domain itself' => ['functions.fnc.fr-par.scw.cloud'],
+    'two names deep' => ['evil.shop-web.functions.fnc.fr-par.scw.cloud'],
+    'another Scaleway service' => ['shop.s3.fr-par.scw.cloud'],
+    'a lookalike' => ['shop-web.functions.fnc.fr-par.scw.cloud.evil.example'],
+]);
+
 test('without the edge secret nobody chooses a hostname', function (): void {
     $this->get('/host', ['Cdn-Host' => 'www.shop.example'])->assertSee('localhost|');
     $this->get('/host', ['X-Brewless-Edge' => 'wrong', 'Cdn-Host' => 'www.shop.example'])->assertSee('localhost|secret-gone');

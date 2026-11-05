@@ -3,6 +3,17 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.4.1 (5 November 2026)
+
+- **A request on the container's own Scaleway address is HTTPS, so the URLs the application writes are
+  too.** An environment without an edge is visited on `<name>.functions.fnc.<region>.scw.cloud`, where
+  TLS ends at Scaleway's front end and the request reaches the container as http. Laravel wrote
+  `http://` asset URLs into the page there, and the browser blocked `/build/assets/app-*.js` as mixed
+  content; an application had to call `URL::forceScheme('https')` itself. The package goes by the
+  hostname, which reaches only this container and only over HTTPS (`http_option: redirected`), and
+  still believes no `X-Forwarded-Proto` without the edge secret. Requests through the edge and on local
+  development hosts are unchanged.
+
 ## 1.4.0 (5 November 2026)
 
 - **A JSON answer keeps its session only when the request shows a script fetched it.** Every

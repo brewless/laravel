@@ -42,9 +42,22 @@ use Symfony\Component\HttpFoundation\Response;
  * visitor whatever the container saw. It is marked so, and the URLs the
  * application generates (assets, links, redirects) start with https://
  * without the application having to trust a proxy.
+ *
+ * An environment without an edge is visited on the container's own address
+ * at Scaleway (`<name>.functions.fnc.<region>.scw.cloud`). TLS ends at
+ * Scaleway's front end there too, so the request reaches the container as
+ * http, and is marked as HTTPS on its hostname. A name under that domain
+ * reaches only the container it belongs to, so a request carrying it came
+ * through Scaleway's front end, and that front end lets nothing but HTTPS
+ * through to a container Brewless provisioned (`http_option: redirected`).
+ * X-Forwarded-Proto is not believed instead: a visitor can write it, and the
+ * package cannot tell whether Scaleway overwrote it.
  */
 final class TrustEdgeHost
 {
+    /** The container's own address at Scaleway: one name under the region's functions domain. */
+    private const string CONTAINER_ADDRESS = '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.functions\.fnc\.[a-z]{2}-[a-z]{3}\.scw\.cloud$/';
+
     /**
      * @param  Closure(Request): Response  $next
      */
@@ -53,6 +66,10 @@ final class TrustEdgeHost
         $secrets = self::secrets();
 
         if ($secrets === []) {
+            if ($this->onContainerAddress($request)) {
+                $this->markSecure($request);
+            }
+
             $this->keepOnly($request, $this->visitorAddress($request));
 
             return $next($request);
@@ -68,7 +85,7 @@ final class TrustEdgeHost
             $request->server->set('SERVER_NAME', $host);
         }
 
-        if ($fromEdge) {
+        if ($fromEdge || $this->onContainerAddress($request)) {
             $this->markSecure($request);
         }
 
@@ -147,6 +164,14 @@ final class TrustEdgeHost
         $request->headers->set('X-Forwarded-Port', '443');
         $request->server->set('HTTP_X_FORWARDED_PROTO', 'https');
         $request->server->set('HTTP_X_FORWARDED_PORT', '443');
+    }
+
+    /** Whether the request names the container's own address at Scaleway. */
+    private function onContainerAddress(Request $request): bool
+    {
+        $host = strtolower(rtrim((string) $request->headers->get('Host'), '.'));
+
+        return preg_match(self::CONTAINER_ADDRESS, $host) === 1;
     }
 
     private function edgeHost(Request $request): ?string

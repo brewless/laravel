@@ -120,6 +120,23 @@ edge, but there is the provider's own front end, which appends the address it
 saw as the last entry: only that entry is kept, so a visitor cannot choose
 their own address there either.
 
+### HTTPS without an edge
+
+An environment without an edge is visited on the container's own address at
+Scaleway, `<name>.functions.fnc.<region>.scw.cloud`. TLS ends at Scaleway's
+front end, so the request reaches the container as plain http, and without
+help Laravel would write `http://` into its pages; the browser then blocks the
+assets as mixed content. A request on that address is marked as HTTPS, so the
+URLs come out as `https://` without `URL::forceScheme()` or `TrustProxies`.
+
+The package goes by the hostname, not by `X-Forwarded-Proto`. A name under
+Scaleway's functions domain reaches only the container it belongs to, and
+Brewless provisions every container with `http_option: redirected`, so
+Scaleway answers plain http with a redirect and lets only HTTPS through. A
+header can be written by anyone who calls the container, and the package cannot
+tell whether the front end overwrote it. Requests through the edge and on
+any other host, local development included, keep the scheme they had.
+
 ### Pages the edge keeps
 
 A serverless container sleeps only after a quiet spell (15 minutes at
