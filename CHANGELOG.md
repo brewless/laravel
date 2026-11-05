@@ -3,6 +3,12 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.2.1 (5 November 2026)
+
+- `brewless:sleep` runs over the ops route again. It was registered behind `runningInConsole()`, which is
+  false for a command `brewless command` delivers over HTTP, so `brewless command production
+  "brewless:sleep"` — what the documentation tells you to run — answered "Command is not defined".
+
 ## 1.2.0 (5 November 2026)
 
 - The edge secret can be replaced without a moment in which the edge and the container disagree. `BREWLESS_EDGE_SECRET_PREVIOUS` holds the secret before it and counts in full, so a container believes either while Brewless points the edge at the new one; Brewless sets it and takes it away again, and nothing needs setting by hand.

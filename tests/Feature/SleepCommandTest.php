@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Brewless\Laravel\Tests\TestCase;
+use Illuminate\Console\Application as ConsoleApplication;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 
@@ -114,4 +116,31 @@ test('a page behind a sign-in and one that needs a parameter are not asked', fun
     [$output] = sleepRun();
 
     expect($output)->not->toContain('/account')->and($output)->not->toContain('/post/');
+});
+
+test('it is there when nothing runs in the console, where brewless command sends it', function (): void {
+    // Not a detail: `brewless command production "brewless:sleep"` is what the documentation tells
+    // people to run, and an ops request is not a console run. Registered behind runningInConsole(),
+    // the command was undefined there (found on production, 5 November 2026). A test suite always
+    // runs in the console, so the application is built again with that turned off.
+    putenv('APP_RUNNING_IN_CONSOLE=false');
+
+    try {
+        // Artisan::starting() keeps its hooks on the console application itself, so without this
+        // the registration of the application this test runs in would count for the new one too.
+        ConsoleApplication::forgetBootstrappers();
+
+        $app = $this->createApplication();
+
+        expect($app->runningInConsole())->toBeFalse()
+            ->and(array_keys($app->make(Kernel::class)->all()))->toContain('brewless:sleep');
+    } finally {
+        putenv('APP_RUNNING_IN_CONSOLE');
+    }
+});
+
+test('it runs over the ops route, the way brewless command delivers it', function (): void {
+    $this->postJson('/_ops/command', ['command' => 'brewless:sleep --path=/page'], ['X-Brewless-Ops' => TestCase::OPS_SECRET])
+        ->assertOk()
+        ->assertJsonPath('exit_code', 0);
 });

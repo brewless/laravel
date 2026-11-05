@@ -222,9 +222,10 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $this->publishes([__DIR__.'/../config/brewless.php' => config_path('brewless.php')], 'brewless-config');
 
-        if ($this->app->runningInConsole()) {
-            $this->commands([SleepCommand::class]);
-        }
+        // Not behind runningInConsole(): `brewless command` runs a command over HTTP, on the
+        // ops route, where that is false. Registering only tells Artisan the name; the command
+        // itself is built when it runs.
+        $this->commands([SleepCommand::class]);
 
         // The agent skills of resources/boost/skills, for a project without Laravel Boost (which finds them
         // by itself): .agents/skills is read by Codex, Amp, OpenCode, Zed and others, .claude/skills by Claude Code.
