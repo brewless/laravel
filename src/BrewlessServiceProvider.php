@@ -9,6 +9,7 @@ use Brewless\Laravel\Capacity\CapacityApi;
 use Brewless\Laravel\Capacity\CapacityClient;
 use Brewless\Laravel\Console\SleepCommand;
 use Brewless\Laravel\Database\MySqlConnection;
+use Brewless\Laravel\Database\PersistentConnections;
 use Brewless\Laravel\Database\PostgresConnection;
 use Brewless\Laravel\Databases\DatabaseClient;
 use Brewless\Laravel\Http\Controllers\MailEventsController;
@@ -40,6 +41,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use PDO;
 
 final class BrewlessServiceProvider extends ServiceProvider
 {
@@ -59,6 +61,11 @@ final class BrewlessServiceProvider extends ServiceProvider
         }
 
         $this->trustRedisCertificate();
+
+        if (config('brewless.database.persistent') === true) {
+            config(['database.connections' => PersistentConnections::configure((array) config('database.connections', []))]);
+        }
+
         $this->retryLostConnections();
 
         // Laravel's StartSession, which leaves out the session of a guest whose page does not need one (see
@@ -193,9 +200,28 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         foreach (['pgsql' => PostgresConnection::class, 'mysql' => MySqlConnection::class] as $driver => $class) {
             if (Connection::getResolver($driver) === null) {
-                Connection::resolverFor($driver, static fn (mixed $pdo, string $database, string $prefix, array $config): Connection => new $class($pdo, $database, $prefix, $config));
+                Connection::resolverFor($driver, static fn (mixed $pdo, string $database, string $prefix, array $config): Connection => new $class(self::handedOver($pdo, $config), $database, $prefix, $config));
             }
         }
+    }
+
+    /**
+     * A persistent connection is checked for a transaction an earlier request
+     * left open, when it is first used (see PersistentConnections).
+     *
+     * @param  array<array-key, mixed>  $config
+     */
+    private static function handedOver(mixed $pdo, array $config): mixed
+    {
+        if (($config['options'][PDO::ATTR_PERSISTENT] ?? false) !== true) {
+            return $pdo;
+        }
+
+        if ($pdo instanceof PDO) {
+            return PersistentConnections::fresh($pdo);
+        }
+
+        return $pdo instanceof Closure ? static fn (): PDO => PersistentConnections::fresh($pdo()) : $pdo;
     }
 
     private static function setting(string $key): ?string

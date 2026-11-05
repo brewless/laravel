@@ -3,6 +3,16 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.5.0 (5 November 2026)
+
+- **`BREWLESS_DB_PERSISTENT=true` keeps the database connections open between requests.** The `pgsql`,
+  `mysql` and `mariadb` connections are asked for with `PDO::ATTR_PERSISTENT`, unless a connection
+  decides itself, so each PHP thread keeps its connection and a request skips the TLS handshake with
+  the database. Measured on Serverless SQL with 20 containers of 1 vCPU (BL-248): 184 to 335 requests a
+  second, the median from 6.3 s to 67 ms. A connection handed over in the middle of a transaction a
+  dead request left is rolled back first; one the database dropped after a restart fails its first
+  query as a lost connection and is tried again on a new one. Off by default.
+
 ## 1.4.1 (5 November 2026)
 
 - **A request on the container's own Scaleway address is HTTPS, so the URLs the application writes are

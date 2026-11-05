@@ -209,9 +209,18 @@ return [
     | when the provider restarts the database for maintenance, is tried again
     | for up to this many seconds instead of once (never inside a
     | transaction). 0 keeps Laravel's own single try.
+    |
+    | `persistent` keeps the PostgreSQL and MySQL connections open between
+    | requests: each PHP thread of FrankenPHP (two per vCPU) holds one, so a
+    | request skips the TLS handshake with the database. Measured on Serverless
+    | SQL (BL-248): 184 to 335 requests a second on the same containers, the
+    | median from 6.3 s to 67 ms. Every container then holds as many
+    | connections as it has threads, also while it is quiet; an open
+    | connection does not keep a Serverless SQL Database awake.
     */
     'database' => [
         'retry_seconds' => (int) env('BREWLESS_DB_RETRY_SECONDS', 60),
+        'persistent' => filter_var(env('BREWLESS_DB_PERSISTENT', false), FILTER_VALIDATE_BOOL),
     ],
 
     /*

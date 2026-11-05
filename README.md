@@ -300,6 +300,28 @@ with pauses of 1, 2, 4 and then 8 seconds, for up to `BREWLESS_DB_RETRY_SECONDS`
 with the connection. An application with a connection class of its own for a
 driver keeps it.
 
+### Connections that stay open
+
+`BREWLESS_DB_PERSISTENT=true` keeps the `pgsql`, `mysql` and `mariadb`
+connections open between requests (`PDO::ATTR_PERSISTENT`): every PHP thread
+of FrankenPHP, two per vCPU, holds one, and a request no longer starts with a
+TLS handshake with the database. On Serverless SQL that took a vote endpoint
+from 184 to 335 requests a second on the same 20 containers, and the median
+from 6.3 s to 67 ms. Off unless you turn it on; a connection that sets
+`PDO::ATTR_PERSISTENT` itself keeps its own choice.
+
+- Each container holds as many connections as it has threads, also while it
+  is quiet: containers × threads has to stay under what the database accepts.
+  A Serverless SQL Database accepts more as it gets more vCPU, up to 1,000.
+  An open connection does not keep it awake.
+- A connection handed to the next request in the middle of a transaction, left
+  by a request that died, is rolled back before anything runs on it.
+- After the database restarted (a boost, a failover, maintenance) the first
+  query on an old connection fails as a lost connection and is tried again on
+  a new one, as above.
+- Session settings stay with the connection, so the next request on that
+  thread gets them. Never rely on one: Serverless SQL shares sessions anyway.
+
 ### A cache in cluster mode
 
 With `cache: {name: …, nodes: 3}` in `brewless.yml` the cache is a cluster of
@@ -591,6 +613,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT`, `BREWLESS_DATABASES_KEY` | Where and as which environment to ask Brewless for a database per tenant, and the key to sign with; set by Brewless with `databases` in `brewless.yml` |
 | `BREWLESS_CAPACITY_KEY` | The key to sign capacity boosts with (with `BREWLESS_API_URL` and `BREWLESS_ENVIRONMENT`); shown once in the Brewless console when the owner switches it on |
 | `BREWLESS_DB_RETRY_SECONDS` | How long a query whose connection went away is tried again (`60`); `0` keeps Laravel's single try |
+| `BREWLESS_DB_PERSISTENT` | Keep the database connections open between requests (`false`) |
 | `RELEASE` | The running image; set by Brewless on each release |
 
 Other release commands, queue time and tries, or more commands to refuse:
