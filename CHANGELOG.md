@@ -3,6 +3,14 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.5.1 (5 November 2026)
+
+- **`brewless:sleep` names a web app manifest without `?v=` too.** Brewless now serves a versioned
+  `.webmanifest` from the storage zone, like stylesheets, images and fonts: a browser asks the
+  manifest of every page it opens, and without a version each of those asks reached the container
+  (coding.agency: about a hundred a day). The command lists it among the files your pages name
+  without a version, so `<link rel="manifest" href="/site.webmanifest">` shows up as something to fix.
+
 ## 1.5.0 (5 November 2026)
 
 - **`BREWLESS_DB_PERSISTENT=true` keeps the database connections open between requests.** The `pgsql`,

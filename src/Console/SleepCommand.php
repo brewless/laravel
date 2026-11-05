@@ -44,7 +44,7 @@ final class SleepCommand extends Command
      * puts on the zone; see the documentation under Versioned files from
      * `public/`.
      */
-    private const array VERSIONABLE = ['css', 'js', 'mjs', 'svg', 'ico', 'png', 'jpg', 'jpeg', 'webp', 'avif', 'gif', 'woff2', 'woff', 'ttf', 'otf'];
+    private const array VERSIONABLE = ['css', 'js', 'mjs', 'svg', 'ico', 'png', 'jpg', 'jpeg', 'webp', 'avif', 'gif', 'woff2', 'woff', 'ttf', 'otf', 'webmanifest'];
 
     /** Routes of tooling that no visitor asks for. */
     private const array NOT_A_PAGE = ['_ops', '_ignition', '_debugbar', 'telescope', 'horizon', 'pulse', 'sanctum', 'livewire', 'broadcasting'];

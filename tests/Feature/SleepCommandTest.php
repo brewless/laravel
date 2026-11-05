@@ -43,6 +43,7 @@ beforeEach(function (): void {
         return 'here';
     });
     Route::get('/logo', fn () => response('<html><body><img src="/img/logo.png"><img src="/img/hero.webp?v=2903919055"></body></html>')->header('Content-Type', 'text/html'));
+    Route::get('/manifest', fn () => response('<html><head><link rel="manifest" href="/site.webmanifest"></head><body></body></html>')->header('Content-Type', 'text/html'));
 });
 
 test('it says a page is kept at the edge', function (): void {
@@ -100,6 +101,13 @@ test('it counts the files a page names that have no version', function (): void 
         ->and($output)->toContain('/img/logo.png')
         // The one with ?v= comes from the storage zone.
         ->and($output)->not->toContain('/img/hero.webp');
+});
+
+test('it counts a web app manifest without a version, which the storage zone serves with one', function (): void {
+    [$output] = sleepRun(['/manifest']);
+
+    expect($output)->toContain('1 files your pages name have no ?v=')
+        ->and($output)->toContain('/site.webmanifest');
 });
 
 test('it names a schedule that repeats within the hour, and leaves an hourly one alone', function (): void {
