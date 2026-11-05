@@ -84,4 +84,4 @@ With that secret the edge proves to the containers that a request came through i
 brewless edge:rotate-secret production
 ```
 
-It takes two releases of the image that is live (nothing is built, nothing is rolled back) because the containers hold the new secret and the one before it until the edge has moved over; the site keeps answering throughout, and each release empties the edge cache. It needs `brewless/laravel` 1.1 or later, variables kept through Brewless, and a worker or release container; otherwise the command says so and changes nothing.
+It takes two releases of the image that is live (nothing is built, nothing is rolled back) because the containers hold the new secret and the one before it until the edge has moved over; the site keeps answering throughout, and each release empties the edge cache. It needs `brewless/laravel` 1.2 or later, variables kept through Brewless, and a worker or release container; otherwise the command says so and changes nothing.
