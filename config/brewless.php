@@ -93,10 +93,12 @@ return [
         'secret_header' => 'X-Brewless-Edge',
         'host_header' => 'Cdn-Host',
 
-        // How many proxies append to X-Forwarded-For between the visitor and
-        // the container: the edge itself, plus whatever stands in front of the
-        // container. The visitor's address is that many from the end.
-        'hops' => (int) env('BREWLESS_EDGE_HOPS', 1),
+        // How many entries the edge writes into X-Forwarded-For: bunny.net's
+        // edge and its Origin Shield, which every pull zone Brewless manages
+        // has. Addresses of the container's own network that the provider
+        // appends behind them are skipped by themselves. The visitor's address
+        // is that many from the end of what is left.
+        'hops' => (int) env('BREWLESS_EDGE_HOPS', 2),
 
         // Domains that are yours. A hostname is believed when it is one of these or a subdomain of one.
         'domains' => array_values(array_filter(explode(',', (string) env('BREWLESS_DOMAINS', (string) parse_url((string) env('APP_URL', ''), PHP_URL_HOST))))),

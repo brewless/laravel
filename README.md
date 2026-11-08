@@ -112,13 +112,16 @@ the replacement takes. `GET /_ops/status` reports under `edge_secrets` how
 many it holds, never which.
 
 The visitor's address is treated the same way. With an edge secret set, only
-the entry the edge appended to `X-Forwarded-For` is kept, and a request
-without the secret loses the header, so rate limits count the real visitor
-and nobody chooses their own address. `BREWLESS_EDGE_HOPS` says how many
-proxies append to the header (default 1). Without an edge secret there is no
+the address the edge saw is kept in `X-Forwarded-For`, and a request without
+the secret loses the header, so rate limits count the real visitor and nobody
+chooses their own address. Scaleway's front end appends addresses of its own
+network (`100.64.0.0/10`) behind the edge's entries; those, and private
+addresses, are skipped first. `BREWLESS_EDGE_HOPS` says how many entries the
+edge itself writes: 2 by default, bunny.net's edge and its Origin Shield,
+which every pull zone Brewless manages has. Without an edge secret there is no
 edge, but there is the provider's own front end, which appends the address it
-saw as the last entry: only that entry is kept, so a visitor cannot choose
-their own address there either.
+saw: only that entry is kept, so a visitor cannot choose their own address
+there either.
 
 ### HTTPS without an edge
 
@@ -601,7 +604,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_EDGE_SECRET` | The secret the edge adds to every request |
 | `BREWLESS_EDGE_SECRET_PREVIOUS` | The secret before it, while Brewless replaces it; counts in full and is taken away again |
 | `BREWLESS_DOMAINS` | Comma-separated domains that are yours |
-| `BREWLESS_EDGE_HOPS` | Proxies between the visitor and the container (`1`) |
+| `BREWLESS_EDGE_HOPS` | Entries the edge writes into `X-Forwarded-For`, after the container network's own are skipped (`2`) |
 | `BREWLESS_EDGE_CACHE` | Seconds the edge keeps an answer that is the same for everybody (`3600`); `0` keeps nothing |
 | `BREWLESS_STATELESS_GUESTS` | Leave the session out for a guest without a cookie whose HTML page does not need one; unset: on Laravel 13 only. `true` on Laravel 12 too, `false` keeps a session on every page of the `web` group |
 | `BREWLESS_PREVIEW_DOMAINS` | Comma-separated test domains (`brewless.dev`); empty turns the test address off |

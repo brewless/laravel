@@ -70,13 +70,30 @@ test('an application without an edge secret believes no header', function (): vo
 test('through the edge the visitor address is what the edge appended, whatever the visitor put in front', function (): void {
     $edge = ['X-Brewless-Edge' => TestCase::EDGE_SECRET];
 
-    $this->get('/address', $edge + ['X-Forwarded-For' => '203.0.113.7'])->assertSee('forwarded:203.0.113.7');
-    $this->get('/address', $edge + ['X-Forwarded-For' => '198.51.100.1, 203.0.113.7'])->assertSee('forwarded:203.0.113.7');
-
-    config(['brewless.edge.hops' => 2]);
-
-    $this->get('/address', $edge + ['X-Forwarded-For' => '198.51.100.1, 203.0.113.7, 192.0.2.10'])->assertSee('forwarded:203.0.113.7');
+    // bunny.net's edge writes the visitor, its Origin Shield the edge: two entries.
+    $this->get('/address', $edge + ['X-Forwarded-For' => '203.0.113.7,192.0.2.10'])->assertSee('forwarded:203.0.113.7');
+    $this->get('/address', $edge + ['X-Forwarded-For' => '198.51.100.1, 203.0.113.7,192.0.2.10'])->assertSee('forwarded:203.0.113.7');
     $this->get('/address', $edge + ['X-Forwarded-For' => '203.0.113.7'])->assertSee('forwarded:nothing');
+
+    config(['brewless.edge.hops' => 1]);
+
+    $this->get('/address', $edge + ['X-Forwarded-For' => '198.51.100.1, 203.0.113.7'])->assertSee('forwarded:203.0.113.7');
+});
+
+test('the addresses Scaleway appends from its own network are skipped before counting', function (): void {
+    $edge = ['X-Brewless-Edge' => TestCase::EDGE_SECRET];
+
+    // As measured on coding.agency on 8 November 2026.
+    $this->get('/address', $edge + ['X-Forwarded-For' => '31.160.53.70,79.127.134.225, 100.96.2.162, 100.96.34.92'])
+        ->assertSee('forwarded:31.160.53.70');
+
+    // A visitor who writes addresses of their own in front still gets the one the edge saw.
+    $this->get('/address', $edge + ['X-Forwarded-For' => '1.2.3.4, 100.96.0.1, 31.160.53.70,79.127.134.225, 100.96.2.162'])
+        ->assertSee('forwarded:31.160.53.70');
+
+    // Private and loopback addresses at the end are the container network too.
+    $this->get('/address', $edge + ['X-Forwarded-For' => '31.160.53.70,79.127.134.225, 10.0.0.4, 127.0.0.1'])
+        ->assertSee('forwarded:31.160.53.70');
 });
 
 test('without the edge secret the forwarded address is dropped, so nobody picks their own', function (array $headers): void {
@@ -91,6 +108,7 @@ test('an application without an edge keeps the address its provider appended, an
     config(['brewless.edge.secret' => null]);
 
     $this->get('/address', ['X-Forwarded-For' => '203.0.113.7'])->assertSee('forwarded:203.0.113.7');
+    $this->get('/address', ['X-Forwarded-For' => '203.0.113.7, 100.96.2.162, 100.96.34.92'])->assertSee('forwarded:203.0.113.7');
     // A visitor who writes an address of their choosing in front gets the one the provider saw.
     $this->get('/address', ['X-Forwarded-For' => '1.2.3.4, 203.0.113.7'])->assertSee('forwarded:203.0.113.7');
     $this->get('/address', ['X-Forwarded-For' => 'not-an-address'])->assertDontSee('not-an-address');
@@ -119,7 +137,7 @@ test('while the secret is being replaced the one before it counts just as much',
     $this->get('http://localhost/url', ['X-Brewless-Edge' => $secret, 'Cdn-Host' => 'www.shop.example'])
         ->assertSee('https://www.shop.example/build/app.css|secure');
 
-    $this->get('http://localhost/address', ['X-Brewless-Edge' => $secret, 'X-Forwarded-For' => '203.0.113.7'])
+    $this->get('http://localhost/address', ['X-Brewless-Edge' => $secret, 'X-Forwarded-For' => '203.0.113.7,192.0.2.10'])
         ->assertSee('forwarded:203.0.113.7');
 })->with([
     'the one in force' => ['the-new-one'],

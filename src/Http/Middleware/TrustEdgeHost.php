@@ -6,6 +6,7 @@ namespace Brewless\Laravel\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -26,16 +27,19 @@ use Symfony\Component\HttpFoundation\Response;
  * standing.
  *
  * The visitor's address travels in X-Forwarded-For, to which every proxy on
- * the way appends what it saw. A visitor can put anything in front of that,
- * so only the last entries count: as many as there are proxies
- * (`brewless.edge.hops`), and only with the secret. Without it the header is
- * dropped, so a request that did not come through the edge cannot choose its
- * own address either.
+ * the way appends what it saw. Scaleway's front end appends addresses of its
+ * own network (100.64.0.0/10) behind the edge's entries; those, and any
+ * private address, are skipped from the end first. Of what is left a visitor
+ * can have put anything in front, so only the edge's own entries count: as
+ * many as it writes (`brewless.edge.hops`, 2 with Origin Shield, which every
+ * pull zone Brewless manages has), and only with the secret. Without it the
+ * header is dropped, so a request that did not come through the edge cannot
+ * choose its own address either.
  *
  * An application without an edge secret has no edge in front, but still the
- * provider's own front end, which appends the address it saw as the last
- * entry. Only that entry is kept: what a visitor wrote in front of it is not
- * believed, so rate limits count the real visitor here too.
+ * provider's own front end, which appends the address it saw. Only that entry
+ * is kept: what a visitor wrote in front of it is not believed, so rate
+ * limits count the real visitor here too.
  *
  * The edge forces HTTPS on every request and reaches the container over a
  * connection of its own, so a request with the secret was HTTPS for the
@@ -55,6 +59,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class TrustEdgeHost
 {
+    /** Networks only the provider's own front end and the container live in. */
+    private const array CONTAINER_NETWORKS = ['100.64.0.0/10', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '::1/128', 'fc00::/7', 'fe80::/10'];
+
     /** The container's own address at Scaleway: one name under the region's functions domain. */
     private const string CONTAINER_ADDRESS = '/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.functions\.fnc\.[a-z]{2}-[a-z]{3}\.scw\.cloud$/';
 
@@ -70,7 +77,7 @@ final class TrustEdgeHost
                 $this->markSecure($request);
             }
 
-            $this->keepOnly($request, $this->visitorAddress($request));
+            $this->keepOnly($request, $this->visitorAddress($request, 1));
 
             return $next($request);
         }
@@ -89,7 +96,7 @@ final class TrustEdgeHost
             $this->markSecure($request);
         }
 
-        $this->keepOnly($request, $fromEdge ? $this->visitorAddress($request) : null);
+        $this->keepOnly($request, $fromEdge ? $this->visitorAddress($request, max(1, (int) config('brewless.edge.hops'))) : null);
 
         // The secret has done its job; nothing further down needs to see it.
         $request->headers->remove((string) config('brewless.edge.secret_header'));
@@ -192,14 +199,21 @@ final class TrustEdgeHost
     }
 
     /**
-     * The address the edge saw: the entry the proxies' own entries sit
-     * behind. Null when the header is too short to hold it, which a request
+     * The address the first proxy saw: behind it sit the given number of
+     * entries, once the container network's own entries are taken off the
+     * end. Null when the header is too short to hold it, which a request
      * through the edge never is.
+     *
+     * Measured on coding.agency (8 November 2026) through bunny.net with
+     * Origin Shield and Scaleway: `visitor,edge, 100.96.2.162, 100.96.34.92`.
      */
-    private function visitorAddress(Request $request): ?string
+    private function visitorAddress(Request $request, int $hops): ?string
     {
         $forwarded = array_map(trim(...), explode(',', (string) $request->headers->get('X-Forwarded-For')));
-        $hops = max(1, (int) config('brewless.edge.hops'));
+
+        while ($forwarded !== [] && self::inContainerNetwork(end($forwarded))) {
+            array_pop($forwarded);
+        }
 
         if (count($forwarded) < $hops) {
             return null;
@@ -208,5 +222,16 @@ final class TrustEdgeHost
         $address = $forwarded[count($forwarded) - $hops];
 
         return filter_var($address, FILTER_VALIDATE_IP) === false ? null : $address;
+    }
+
+    /**
+     * Whether an entry is an address of the network the container runs in: the
+     * provider's own (100.64.0.0/10 at Scaleway), private or loopback. No
+     * visitor on the internet has one, so it is never the visitor's address.
+     */
+    private static function inContainerNetwork(string $entry): bool
+    {
+        return filter_var($entry, FILTER_VALIDATE_IP) !== false
+            && IpUtils::checkIp($entry, self::CONTAINER_NETWORKS);
     }
 }

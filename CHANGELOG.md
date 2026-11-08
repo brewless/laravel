@@ -3,6 +3,18 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.6.0 (8 November 2026)
+
+- **`request()->ip()` is the visitor again, not an address of Scaleway's network.** Through
+  bunny.net with Origin Shield and Scaleway, `X-Forwarded-For` reaches the container as
+  `visitor,edge, 100.96.x.x, 100.96.y.y` (measured on coding.agency). With one hop the package kept
+  the last entry, an address of Scaleway's own network, so every visitor shared one rate limit and
+  logs and mails showed the same address for everybody. Addresses of the container's network
+  (`100.64.0.0/10`, private, loopback) are now skipped from the end first, and `BREWLESS_EDGE_HOPS`
+  counts only the entries the edge writes. Its default goes from 1 to 2: the edge and the Origin
+  Shield every pull zone Brewless manages has. An application that set it by hand to count
+  Scaleway's entries too sets it back, or removes it.
+
 ## 1.5.1 (5 November 2026)
 
 - **`brewless:sleep` names a web app manifest without `?v=` too.** Brewless now serves a versioned
