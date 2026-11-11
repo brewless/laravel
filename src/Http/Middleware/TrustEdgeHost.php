@@ -54,6 +54,10 @@ use Symfony\Component\HttpFoundation\Response;
  * reaches only the container it belongs to, so a request carrying it came
  * through Scaleway's front end, and that front end lets nothing but HTTPS
  * through to a container Brewless provisioned (`http_option: redirected`).
+ * The test address Brewless attaches to the container (a name under
+ * `brewless.dev`) reaches it the same way, through Scaleway's front end, and
+ * is marked as HTTPS too.
+ *
  * X-Forwarded-Proto is not believed instead: a visitor can write it, and the
  * package cannot tell whether Scaleway overwrote it.
  */
@@ -173,12 +177,30 @@ final class TrustEdgeHost
         $request->server->set('HTTP_X_FORWARDED_PORT', '443');
     }
 
-    /** Whether the request names the container's own address at Scaleway. */
+    /**
+     * Whether the request names the container's own address at Scaleway, or
+     * the test address Brewless attached to it: one name under a test domain
+     * (`acme-shop-production.brewless.dev`). Scaleway's front end ends TLS
+     * for both and lets only HTTPS through, so either was HTTPS for the
+     * visitor.
+     */
     private function onContainerAddress(Request $request): bool
     {
         $host = strtolower(rtrim((string) $request->headers->get('Host'), '.'));
 
-        return preg_match(self::CONTAINER_ADDRESS, $host) === 1;
+        if (preg_match(self::CONTAINER_ADDRESS, $host) === 1) {
+            return true;
+        }
+
+        foreach ((array) config('brewless.preview.domains') as $domain) {
+            $domain = is_string($domain) ? strtolower(trim($domain, '. ')) : '';
+
+            if ($domain !== '' && preg_match('/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.'.preg_quote($domain, '/').'$/', $host) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function edgeHost(Request $request): ?string

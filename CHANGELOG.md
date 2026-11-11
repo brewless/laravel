@@ -3,6 +3,15 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.6.2 (11 November 2026)
+
+- **On the test address the page loads its scripts and stylesheets over HTTPS.** Scaleway ends TLS
+  in front of the container, so a request on `<name>.brewless.dev` reached it as http and every URL
+  the application wrote started with `http://`. The browser, on an HTTPS page, blocked them as mixed
+  content: no stylesheet and no JavaScript (seen on refero-ict, whose IT-check did nothing). A name
+  under a test domain is now marked as HTTPS like the container's own address at Scaleway, which
+  also lets only HTTPS through.
+
 ## 1.6.1 (11 November 2026)
 
 - **Requires `league/flysystem-aws-s3-v3`.** Where an environment has a bucket, Brewless names

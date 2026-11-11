@@ -39,6 +39,15 @@ test('on the container\'s own address at Scaleway the request is https, so gener
     'nl-ams' => ['shopa1b2c3d4-web.functions.fnc.nl-ams.scw.cloud'],
 ]);
 
+test('on the test address the request is https, so its pages load their assets over https', function (?string $secret): void {
+    config(['brewless.edge.secret' => $secret]);
+
+    $this->get('http://acme-shop-production.brewless.dev/url')->assertSee('https://acme-shop-production.brewless.dev/build/app.css|secure');
+})->with([
+    'without an edge' => [null],
+    'with an edge, called directly' => [TestCase::EDGE_SECRET],
+]);
+
 test('any other host keeps the scheme the container saw, whatever X-Forwarded-Proto says', function (string $host): void {
     config(['brewless.edge.secret' => null]);
 
@@ -50,6 +59,9 @@ test('any other host keeps the scheme the container saw, whatever X-Forwarded-Pr
     'two names deep' => ['evil.shop-web.functions.fnc.fr-par.scw.cloud'],
     'another Scaleway service' => ['shop.s3.fr-par.scw.cloud'],
     'a lookalike' => ['shop-web.functions.fnc.fr-par.scw.cloud.evil.example'],
+    'the test domain itself' => ['brewless.dev'],
+    'two names deep under the test domain' => ['evil.shop.brewless.dev'],
+    'a lookalike of the test domain' => ['shop.brewless.dev.evil.example'],
 ]);
 
 test('without the edge secret nobody chooses a hostname', function (): void {
