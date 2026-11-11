@@ -167,3 +167,16 @@ test('a page is asked on the address the application answers on, not on localhos
 
     expect(config('test.asked_on'))->toBe('https://shop.example');
 });
+
+test('a cookie one page queued is not laid on the pages after it', function (): void {
+    // The cookie driver keeps the session in a cookie named after its id and queues it on the
+    // cookie jar, which outlives one request here: /page after /remembers looked personal too
+    // (seen on refero-ict, 11 November 2026, /sitemap.xml and /llms.txt after /contact).
+    config(['session.driver' => 'cookie']);
+    Route::middleware('web')->get('/plain', fn (): string => 'the same for everybody, in the web group');
+
+    [$output] = sleepRun(['/remembers', '/plain']);
+
+    expect($output)->toContain('1 of 2 pages')
+        ->and($output)->not->toContain('it sets a cookie');
+});

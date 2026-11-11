@@ -3,6 +3,16 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.6.3 (11 November 2026)
+
+- **`brewless:sleep` judges every page on its own, with the cookie session driver too.** It asks all
+  pages in one process, and a page that kept a session left its session and its queued cookies
+  behind for the pages after it. With `SESSION_DRIVER=cookie`, which keeps the session in a cookie
+  named after its id, every page after a form page then seemed to keep a session or set a cookie,
+  while visitors got those pages from the edge (refero-ict: `/sitemap.xml` and `/llms.txt` after
+  `/contact`). Before each page the command now empties the queued cookies and starts a fresh
+  session store, as it already forgot the auth guards.
+
 ## 1.6.2 (11 November 2026)
 
 - **On the test address the page loads its scripts and stylesheets over HTTPS.** Scaleway ends TLS

@@ -134,6 +134,19 @@ final class SleepCommand extends Command
                 app('auth')->forgetGuards();
             }
 
+            // Likewise the cookies a page queued: the cookie session driver queues the session
+            // under its id, and the jar outlives one request here, so every page after it seemed
+            // to set a cookie (refero-ict, 11 November 2026: /sitemap.xml and /llms.txt after /contact).
+            if (app()->resolved('cookie')) {
+                app('cookie')->flushQueuedCookies();
+            }
+
+            // And the session itself: the store the last page filled would be this page's too.
+            if (app()->resolved('session')) {
+                app('session')->forgetDrivers();
+                app()->forgetInstance('session.store');
+            }
+
             // On the application's own address, not on localhost: the hostname and the scheme decide
             // what middleware does with a request, and a page asked on the wrong host answers
             // differently from the one a visitor gets (seen on production, 5 November 2026).
