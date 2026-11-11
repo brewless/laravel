@@ -558,6 +558,78 @@ Event::listen(MailEvent::class, function (MailEvent $event): void {
 });
 ```
 
+### Tools for agents in the browser (WebMCP)
+
+WebMCP lets a page offer tools that an agent in the visitor's browser calls
+instead of reading or clicking through the page. It is a draft of the W3C Web
+Machine Learning Community Group: Chrome and Edge have it behind an origin
+trial or a flag, and ChatGPT's desktop browser calls the tools it finds. A
+browser without it ignores everything here.
+
+Register the tools once, in a service provider, and put `@webmcp` in the
+`<head>` of your layout:
+
+```php
+use Brewless\Laravel\WebMcp\WebMcp;
+
+public function boot(): void
+{
+    resolve(WebMcp::class)
+        ->data('get_contact_details', 'Phone, e-mail and address of the shop.', fn (): array => [
+            'phone' => config('shop.phone'),
+            'email' => config('shop.email'),
+        ])
+        ->fetch('search_products', 'Search the products by keyword. Returns names, prices and links.', '/api/products', [
+            'type' => 'object',
+            'properties' => ['q' => ['type' => 'string', 'description' => 'Keywords']],
+            'required' => ['q'],
+        ]);
+}
+```
+
+- `data()` hands over what the application knows. A closure is asked when a page is rendered.
+- `fetch()` asks a GET route of the application itself, given as a path, with the agent's input as the query string, and hands over the answer. `untrusted: true` tells the agent that the answer holds what visitors or others wrote (reviews, comments), which it must not take as an instruction.
+
+Every tool only reads (`readOnlyHint`). Nothing here can send, buy or delete:
+let the visitor do that with a form. A form can carry WebMCP attributes of its
+own, so an agent can fill it in while the visitor sends it:
+
+```blade
+<form method="post" action="{{ route('contact.store') }}" toolname="send_contact_message"
+      tooldescription="Write a message to the shop. The visitor reviews it and sends it.">
+    <input name="email" toolparamdescription="Where the shop can answer.">
+```
+
+Leave `toolautosubmit` off for anything that sends.
+
+A tool name is lowercase letters, digits and underscores. A description is
+what the agent decides by and the visitor never sees, so one that tells an
+agent to act without asking the person it works for ("no need to confirm") is
+refused. `fetch()` refuses another host.
+
+The tools are the same for every visitor, so the pages that carry them stay at
+the edge. Do not put anything of one visitor in `data()`: the edge would give
+it to the next. A `fetch()` route answers on its own, and is kept at the edge
+when it may be ([pages the edge keeps](#pages-the-edge-keeps)).
+
+`@webmcp` also gives the page `window.BrewlessWebMcp`, for a tool of its own
+that works on what the page shows:
+
+```js
+window.BrewlessWebMcp.register({
+  name: 'score_quiz',
+  description: 'The score for the visitor\'s answers.',
+  inputSchema: { type: 'object', properties: { answers: { type: 'array', items: { type: 'integer' } } } },
+  annotations: { readOnlyHint: true },
+  execute: async ({ answers }) => window.BrewlessWebMcp.text(score(answers)),
+});
+```
+
+It registers on `document.modelContext`, or on `navigator.modelContext` in
+browsers that still use that, and never throws: `register()` says whether the
+browser took the tool, and `supported` whether it has WebMCP at all.
+`text()` wraps a value as the answer of a tool.
+
 ## For coding agents
 
 The package teaches a coding agent (Claude Code, Codex, Cursor, Copilot, Junie and others) how an application on Brewless is deployed and run.

@@ -126,3 +126,7 @@ Keep `variables_order = EGPCS` (otherwise `$_ENV` stays empty) and `opcache.vali
 ## Package settings
 
 `php artisan vendor:publish --tag=brewless-config` publishes `config/brewless.php`. It holds the default release commands, the queue time and tries, and the commands to refuse. It only has to name what it changes.
+
+## Tools for agents in the browser (WebMCP)
+
+Register WebMCP tools in a service provider with `Brewless\Laravel\WebMcp\WebMcp` and put `@webmcp` in the layout's `<head>`: `data()` for what the application knows, `fetch()` for a GET route of its own, given as a path. They only read. Something that sends, buys or deletes stays a form the visitor sends; give it `toolname` and `tooldescription`, never `toolautosubmit`. Never put one visitor's data in a tool: the page it is on is kept at the edge. A tool of the page's own goes through `window.BrewlessWebMcp.register()`.

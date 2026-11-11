@@ -22,6 +22,7 @@ use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
 use Brewless\Laravel\Mail\MailCopies;
 use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
+use Brewless\Laravel\WebMcp\WebMcp;
 use Closure;
 use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\Repository;
@@ -48,6 +49,7 @@ final class BrewlessServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/brewless.php', 'brewless');
+        $this->app->singleton(WebMcp::class);
         $this->fillInDefaults();
 
         // The schedule runs in Amsterdam time unless the application chose a zone for it itself.
@@ -252,6 +254,14 @@ final class BrewlessServiceProvider extends ServiceProvider
         // ops route, where that is false. Registering only tells Artisan the name; the command
         // itself is built when it runs.
         $this->commands([SleepCommand::class]);
+
+        // `@webmcp` in a layout: the WebMCP tools of WebMcp, and the script that registers them.
+        // Only where the application renders Blade.
+        $this->callAfterResolving('blade.compiler', static function (object $blade): void {
+            if (method_exists($blade, 'directive')) {
+                $blade->directive('webmcp', static fn (): string => '<?php echo app(\\'.WebMcp::class.'::class)->render(); ?>');
+            }
+        });
 
         // The agent skills of resources/boost/skills, for a project without Laravel Boost (which finds them
         // by itself): .agents/skills is read by Codex, Amp, OpenCode, Zed and others, .claude/skills by Claude Code.

@@ -3,6 +3,15 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.7.0 (11 November 2026)
+
+- **WebMCP tools with `@webmcp`.** Register tools for agents in the visitor's browser in a service
+  provider (`WebMcp::data()` for what the application knows, `WebMcp::fetch()` for a GET route of
+  its own) and put `@webmcp` in the layout. They only read; a name is checked, `fetch()` refuses
+  another host, and a description that tells an agent to act without asking the person it works for
+  is refused. The page also gets `window.BrewlessWebMcp` for tools of its own. WebMCP is a W3C
+  Community Group draft; a browser without it ignores all of it.
+
 ## 1.6.3 (11 November 2026)
 
 - **`brewless:sleep` judges every page on its own, with the cookie session driver too.** It asks all
