@@ -3,6 +3,14 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.6.1 (11 November 2026)
+
+- **Requires `league/flysystem-aws-s3-v3`.** Where an environment has a bucket, Brewless names
+  `CACHE_STORE=storage` on the `s3` disk, and Laravel needs that package for an `s3` disk. An
+  application without it stopped at boot with `Class "League\Flysystem\AwsS3V3\PortableVisibilityConverter"
+  not found`, so its release container never started (seen on refero-ict). Installing the package now
+  brings the driver along.
+
 ## 1.6.0 (8 November 2026)
 
 - **`request()->ip()` is the visitor again, not an address of Scaleway's network.** Through
