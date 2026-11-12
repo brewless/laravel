@@ -3,6 +3,17 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.7.1 (12 November 2026)
+
+- **An application without a database keeps no failed jobs.** Laravel keeps failed jobs in a table
+  by default, in a SQLite file where the application names no database. An application without a
+  database has neither, so `/_ops/status` counted `failed_jobs` in a file that is not there and
+  every deploy logged `Database file at path [/app/database/database.sqlite] does not exist` (seen
+  on refero-ict). Where failed jobs would be kept in a SQLite file that does not exist, the package
+  now sets `queue.failed.driver` to `null`: the status answers with no failed jobs and a failing
+  job is not written anywhere. A file that exists, a database in memory and a database on a server
+  keep their failed jobs.
+
 ## 1.7.0 (11 November 2026)
 
 - **WebMCP tools with `@webmcp`.** Register tools for agents in the visitor's browser in a service

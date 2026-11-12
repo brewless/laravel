@@ -60,6 +60,13 @@ and the failed jobs table. The answer is always a success, also for a job
 that failed or that was dropped: the provider would otherwise deliver it
 again every half minute, without end.
 
+An application without a database keeps no failed jobs. Laravel's default
+for them is a table, in a SQLite file where the application names no
+database; where that file is not there, the package sets
+`queue.failed.driver` to `null`, so the status and a failing job do not
+look for it. A SQLite file that exists, a database in memory and a
+database on a server keep their failed jobs.
+
 A signed job also carries the moment it was signed and its attempts, so a
 message that was seen once cannot be posted again at will. It is good for
 `ops.job_max_age` seconds (`BREWLESS_JOB_MAX_AGE`, 3600) and dropped after

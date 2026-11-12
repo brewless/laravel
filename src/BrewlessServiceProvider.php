@@ -63,6 +63,7 @@ final class BrewlessServiceProvider extends ServiceProvider
         }
 
         $this->trustRedisCertificate();
+        $this->keepNoFailedJobsWithoutDatabase();
 
         if (config('brewless.database.persistent') === true) {
             config(['database.connections' => PersistentConnections::configure((array) config('database.connections', []))]);
@@ -98,6 +99,35 @@ final class BrewlessServiceProvider extends ServiceProvider
             array_values(array_map(intval(...), (array) config('brewless.capacity.retry_milliseconds', [500, 1000, 2000]))),
         ));
         $this->app->bind(CapacityApi::class, CapacityClient::class);
+    }
+
+    /**
+     * Laravel keeps failed jobs in a table, and where the application names
+     * no database it looks for that table in a SQLite file. An application
+     * without a database has neither: counting its failed jobs, or keeping
+     * one, fails on a file that is not there (seen on refero-ict, at the
+     * status check of every deploy). Such an application keeps no failed jobs.
+     */
+    private function keepNoFailedJobsWithoutDatabase(): void
+    {
+        if (! in_array(config('queue.failed.driver'), ['database', 'database-uuids'], true)) {
+            return;
+        }
+
+        $name = config('queue.failed.database') ?? config('database.default');
+        $connection = is_string($name) ? config('database.connections.'.$name) : null;
+
+        if (! is_array($connection) || ($connection['driver'] ?? null) !== 'sqlite' || ! empty($connection['url'])) {
+            return;
+        }
+
+        $file = $connection['database'] ?? null;
+
+        if (! is_string($file) || $file === '' || str_contains($file, ':memory:') || str_contains($file, 'mode=memory') || file_exists($file)) {
+            return;
+        }
+
+        config(['queue.failed.driver' => 'null']);
     }
 
     /**
