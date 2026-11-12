@@ -22,6 +22,7 @@ use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
 use Brewless\Laravel\Mail\MailCopies;
 use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
+use Brewless\Laravel\Realtime\AllowedOrigins;
 use Brewless\Laravel\WebMcp\WebMcp;
 use Closure;
 use Illuminate\Cache\CacheManager;
@@ -64,6 +65,10 @@ final class BrewlessServiceProvider extends ServiceProvider
 
         $this->trustRedisCertificate();
         $this->keepNoFailedJobsWithoutDatabase();
+
+        // Once every provider has registered, so Reverb's own configuration is there: only the
+        // environment's hostnames may connect to the realtime server.
+        $this->app->booting(AllowedOrigins::limit(...));
 
         if (config('brewless.database.persistent') === true) {
             config(['database.connections' => PersistentConnections::configure((array) config('database.connections', []))]);

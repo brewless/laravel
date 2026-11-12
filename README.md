@@ -565,6 +565,18 @@ Event::listen(MailEvent::class, function (MailEvent $event): void {
 });
 ```
 
+### Who may connect to Reverb
+
+With `realtime` in `brewless.yml` the application gets a Laravel Reverb server in a container of its
+own. Reverb lets a page on any website connect (`'allowed_origins' => ['*']`) and reads no variable
+for it. Brewless names the environment's hostnames in `REVERB_ALLOWED_ORIGINS`, the host of
+`APP_URL` and every domain in `brewless.yml`, and the package puts them where Reverb reads them, for
+every Reverb app in `config/reverb.php` that still allows every origin. A list you wrote there
+yourself is left alone.
+
+A client that sends no `Origin` header, such as a mobile app, is refused once the hostnames are
+limited. Set `REVERB_ALLOWED_ORIGINS=*` among your own variables to keep every origin allowed.
+
 ### Tools for agents in the browser (WebMCP)
 
 WebMCP lets a page offer tools that an agent in the visitor's browser calls
@@ -696,6 +708,7 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `BREWLESS_CAPACITY_KEY` | The key to sign capacity boosts with (with `BREWLESS_API_URL` and `BREWLESS_ENVIRONMENT`); shown once in the Brewless console when the owner switches it on |
 | `BREWLESS_DB_RETRY_SECONDS` | How long a query whose connection went away is tried again (`60`); `0` keeps Laravel's single try |
 | `BREWLESS_DB_PERSISTENT` | Keep the database connections open between requests (`false`) |
+| `REVERB_ALLOWED_ORIGINS` | Comma-separated hostnames whose pages may connect to Reverb; set by Brewless with `realtime` in `brewless.yml`. `*` allows every origin |
 | `RELEASE` | The running image; set by Brewless on each release |
 
 Other release commands, queue time and tries, or more commands to refuse:

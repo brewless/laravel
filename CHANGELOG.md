@@ -3,6 +3,16 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.8.0 (12 November 2026)
+
+- **Only the environment's own hostnames may connect to Reverb.** Laravel Reverb lets a page on any
+  website connect (`'allowed_origins' => ['*']` in `config/reverb.php`) and reads no variable for
+  it. Brewless names the hostnames of an environment with a realtime server in
+  `REVERB_ALLOWED_ORIGINS`: the host of `APP_URL` and every domain in `brewless.yml`. The package
+  now puts them where Reverb reads them, for every Reverb app that still allows every origin. A list
+  you wrote in `config/reverb.php` yourself is left alone. A client that sends no `Origin` header,
+  such as a mobile app, is refused once the hostnames are limited: set `REVERB_ALLOWED_ORIGINS=*`
+  among your variables to keep every origin allowed. Without the variable nothing changes.
 ## 1.7.1 (12 November 2026)
 
 - **An application without a database keeps no failed jobs.** Laravel keeps failed jobs in a table

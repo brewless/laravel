@@ -257,4 +257,18 @@ return [
             'subscribe_hosts' => ['sns.mnq.fr-par.scaleway.com'],
         ],
     ],
+
+    /*
+    | Realtime (`realtime` in brewless.yml): the hostnames a browser may
+    | connect to the realtime server from, comma-separated, as Brewless names
+    | them for the environment: the host of APP_URL and every domain in
+    | brewless.yml. Laravel Reverb allows every origin by itself and reads no
+    | variable for it, so the package puts these where Reverb reads them, for
+    | a Reverb app whose `allowed_origins` is still ['*']. Set
+    | REVERB_ALLOWED_ORIGINS=* among your own variables to let every origin
+    | in, which a client that sends no Origin header (a mobile app) needs.
+    */
+    'realtime' => [
+        'allowed_origins' => env('REVERB_ALLOWED_ORIGINS'),
+    ],
 ];
