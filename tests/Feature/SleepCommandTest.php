@@ -172,7 +172,8 @@ test('a cookie one page queued is not laid on the pages after it', function (): 
     // The cookie driver keeps the session in a cookie named after its id and queues it on the
     // cookie jar, which outlives one request here: /page after /remembers looked personal too
     // (seen on refero-ict, 11 November 2026, /sitemap.xml and /llms.txt after /contact).
-    config(['session.driver' => 'cookie']);
+    // Stateless guests on by hand: on Laravel 12 it is off by itself, and /plain would keep a session of its own.
+    config(['session.driver' => 'cookie', 'brewless.edge.stateless_guests' => true]);
     Route::middleware('web')->get('/plain', fn (): string => 'the same for everybody, in the web group');
 
     [$output] = sleepRun(['/remembers', '/plain']);

@@ -3,6 +3,12 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.9.1 (15 November 2026)
+
+- **The tests pass on Laravel 12 again.** The test for a cookie one page queued (1.6.3) took guests
+  without a session for granted, which is off by itself on Laravel 12, so the workflow failed there
+  from that version on. It turns it on by hand now. Nothing changes for an application.
+
 ## 1.9.0 (15 November 2026)
 
 - **security.txt with one variable.** With `BREWLESS_SECURITY_CONTACT` set, the application answers
