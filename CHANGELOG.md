@@ -3,6 +3,16 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.9.0 (15 November 2026)
+
+- **security.txt with one variable.** With `BREWLESS_SECURITY_CONTACT` set, the application answers
+  `/.well-known/security.txt` (RFC 9116): a `Contact` per address, an `Expires` a year ahead counted
+  from the start of the day, so the edge can keep it, a `Canonical` and `Preferred-Languages`
+  (`BREWLESS_SECURITY_LANGUAGES`, `en`). `BREWLESS_SECURITY_POLICY` adds a `Policy`. Without a
+  contact nothing changes: there is no file, because one without a contact is not valid. A file in
+  `public/` or a route of the application's own for that address comes first. Asked for by the
+  security options of internet.nl on the test address.
+
 ## 1.8.0 (12 November 2026)
 
 - **Only the environment's own hostnames may connect to Reverb.** Laravel Reverb lets a page on any

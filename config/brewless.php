@@ -118,6 +118,18 @@ return [
     ],
 
     /*
+    | Where someone who found a vulnerability reports it: /.well-known/security.txt
+    | (RFC 9116), answered only when a contact is set. An address becomes a
+    | mailto:, a link stays as it is; several are separated by commas. A
+    | security.txt the application has itself comes first.
+    */
+    'security' => [
+        'contact' => env('BREWLESS_SECURITY_CONTACT'),
+        'policy' => env('BREWLESS_SECURITY_POLICY'),
+        'languages' => env('BREWLESS_SECURITY_LANGUAGES', 'en'),
+    ],
+
+    /*
     | The test address Brewless gives every environment.
     |
     | Brewless points `<organisation>-<application>-<environment>` under its

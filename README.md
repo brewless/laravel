@@ -286,6 +286,22 @@ overwrite a `__Host-` cookie of another, so an application on a neighbouring
 test address cannot put a session of its own on yours. On your own domains the
 session cookie keeps its name and settings.
 
+### security.txt
+
+Set `BREWLESS_SECURITY_CONTACT` and the application answers
+`/.well-known/security.txt` (RFC 9116), where someone who found a
+vulnerability looks for whom to tell: a `Contact` line for each address
+(a plain address becomes `mailto:`, a link stays as it is; separate several
+with commas), an `Expires` a year ahead counted from the start of the day, a
+`Canonical` and `Preferred-Languages: en` (`BREWLESS_SECURITY_LANGUAGES`).
+`BREWLESS_SECURITY_POLICY` adds a `Policy` link. Without a contact there is no
+file, because one without is not valid. A `public/.well-known/security.txt` or
+a route of your own for that address comes first.
+
+```env
+BREWLESS_SECURITY_CONTACT=security@example.com
+```
+
 ### A cache in a bucket, with locks
 
 Where an environment has a bucket and no Redis or database, Brewless names `CACHE_STORE=storage` with `CACHE_STORAGE_DISK=s3`: Laravel's `storage` cache, its values in Object Storage, which every container reads and which outlives a container that goes away. Laravel's own store of it has no locks; the package puts one in its place that has them, so `Cache::lock()`, a `ShouldBeUnique` job and `WithoutOverlapping` work. Object Storage cannot hold a lock, so the lock is Laravel's file lock on the container's own disk (`storage/framework/cache/locks`, or `lock_path` in the store's config): atomic within a container, not across containers. Work that must run only once across the whole environment needs a cache the containers share, such as Redis.

@@ -14,6 +14,7 @@ use Brewless\Laravel\Database\PostgresConnection;
 use Brewless\Laravel\Databases\DatabaseClient;
 use Brewless\Laravel\Http\Controllers\MailEventsController;
 use Brewless\Laravel\Http\Controllers\OpsController;
+use Brewless\Laravel\Http\Controllers\SecurityTxtController;
 use Brewless\Laravel\Http\Middleware\CacheAtEdge;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
 use Brewless\Laravel\Http\Middleware\PreviewHost;
@@ -362,6 +363,12 @@ final class BrewlessServiceProvider extends ServiceProvider
         if (is_string(config('brewless.mail.events.topic')) && config('brewless.mail.events.topic') !== '') {
             Route::post('/_ops/mail-events', MailEventsController::class)->name('brewless.ops.mail-events');
         }
+
+        // Where a vulnerability is reported. A route or a file of the application's own comes first: its
+        // routes load after this one and take the same address over, and public/ is served before Laravel.
+        Route::get('/.well-known/security.txt', SecurityTxtController::class)
+            ->withoutMiddleware(BrewlessServiceProvider::sessionMiddleware())
+            ->name('brewless.security-txt');
 
         // Machine traffic from a release and from the provider's triggers: no
         // session, no CSRF, no domain. Without the secret they do not exist.
