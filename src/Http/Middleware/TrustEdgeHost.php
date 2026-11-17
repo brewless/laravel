@@ -63,6 +63,9 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class TrustEdgeHost
 {
+    /** Set on a request that carried the edge secret: it came through the edge. */
+    public const string ATTRIBUTE = 'brewless.edge';
+
     /** Networks only the provider's own front end and the container live in. */
     private const array CONTAINER_NETWORKS = ['100.64.0.0/10', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '::1/128', 'fc00::/7', 'fe80::/10'];
 
@@ -89,6 +92,10 @@ final class TrustEdgeHost
         $given = $request->headers->get((string) config('brewless.edge.secret_header'));
         $fromEdge = is_string($given) && self::accepted($secrets, $given);
         $host = $fromEdge ? $this->edgeHost($request) : null;
+
+        if ($fromEdge) {
+            $request->attributes->set(self::ATTRIBUTE, true);
+        }
 
         if ($host !== null) {
             $request->headers->set('Host', $host);
@@ -188,7 +195,7 @@ final class TrustEdgeHost
     {
         $host = strtolower(rtrim((string) $request->headers->get('Host'), '.'));
 
-        if (preg_match(self::CONTAINER_ADDRESS, $host) === 1) {
+        if (self::isContainerAddress($host)) {
             return true;
         }
 
@@ -201,6 +208,15 @@ final class TrustEdgeHost
         }
 
         return false;
+    }
+
+    /**
+     * Whether a hostname is the container's own address at Scaleway
+     * (`<name>.functions.fnc.<region>.scw.cloud`).
+     */
+    public static function isContainerAddress(string $host): bool
+    {
+        return preg_match(self::CONTAINER_ADDRESS, strtolower(rtrim($host, '.'))) === 1;
     }
 
     private function edgeHost(Request $request): ?string

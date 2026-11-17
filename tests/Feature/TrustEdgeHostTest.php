@@ -28,7 +28,9 @@ test('without the edge secret the scheme stays what the container saw', function
 ]);
 
 test('on the container\'s own address at Scaleway the request is https, so generated urls are too', function (?string $secret, string $host): void {
-    config(['brewless.edge.secret' => $secret]);
+    // An application with its own domain sends a page asked here to that domain (LeaveContainerAddress);
+    // this one has none, so the container's own address is where it answers.
+    config(['brewless.edge.secret' => $secret, 'app.url' => 'https://'.$host]);
 
     $this->get('http://'.$host.'/url')->assertSee('https://'.$host.'/build/app.css|secure');
 })->with([

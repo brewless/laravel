@@ -286,6 +286,36 @@ overwrite a `__Host-` cookie of another, so an application on a neighbouring
 test address cannot put a session of its own on yours. On your own domains the
 session cookie keeps its name and settings.
 
+### Crawlers outside the edge
+
+The web container answers on more than the domain behind the edge: on its own
+address at Scaleway (`<name>.functions.fnc.<region>.scw.cloud`) and on the
+test address. Nothing keeps an answer there, so every request on either
+reaches the container, and a crawler that found one keeps the container awake
+by itself. On coding.agency crawlers asked a page there about every three
+minutes, and a container that sleeps after fifteen quiet minutes never slept.
+The package therefore tells crawlers to go to the real domain, the host of
+`APP_URL`:
+
+- On the container's own address, a `GET` or `HEAD` that did not come through
+  the edge (it carries no valid edge secret, the one in force or the one
+  before it) gets a `301` to the same path and query on `https://` plus the
+  host of `APP_URL`, with `X-Robots-Tag: noindex, nofollow` and
+  `Cache-Control: public, max-age=86400`. `robots.txt` there disallows
+  everything.
+- On the test address, only a crawler is sent away the same way, known by its
+  user agent (`bot`, `crawler`, `spider`, `GPTBot`, `ClaudeBot`,
+  `PerplexityBot`, `Bytespider`, `CCBot`, `facebookexternalhit`, in any case).
+  People get the application there as before, and `robots.txt` still
+  disallows everything for everybody.
+
+What Brewless itself sends the container is left alone: everything under
+`/_ops/`, and every method other than `GET` and `HEAD`, among them the
+`POST /` of the scheduler and the queue. Nothing changes for an application
+without an edge secret (it has no edge, and the container's own address may be
+the only one it has), nor where `APP_URL` names no host or the host the
+request came in on.
+
 ### security.txt
 
 Set `BREWLESS_SECURITY_CONTACT` and the application answers

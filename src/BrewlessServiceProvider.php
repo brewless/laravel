@@ -17,6 +17,7 @@ use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Controllers\SecurityTxtController;
 use Brewless\Laravel\Http\Middleware\CacheAtEdge;
 use Brewless\Laravel\Http\Middleware\EnsureOpsSecret;
+use Brewless\Laravel\Http\Middleware\LeaveContainerAddress;
 use Brewless\Laravel\Http\Middleware\PreviewHost;
 use Brewless\Laravel\Http\Middleware\StartSessionWhenNeeded;
 use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
@@ -339,12 +340,14 @@ final class BrewlessServiceProvider extends ServiceProvider
         }
 
         // First of all middleware: the host decides a lot further down, so it is put back before anything reads it.
-        // Prepended in reverse: the edge's hostname first, then the test address.
+        // Prepended in reverse: the edge's hostname first, then crawlers sent away from the addresses outside the
+        // edge (it needs to know whether the edge secret held, and the test address as it arrived), then the test address.
         // Before those, and so outside every middleware of the application: the edge cache looks at the
         // answer as it leaves, with every cookie and header the application gave it.
         $kernel = $this->app->make(Kernel::class);
         $kernel->prependMiddleware(CacheAtEdge::class);
         $kernel->prependMiddleware(PreviewHost::class);
+        $kernel->prependMiddleware(LeaveContainerAddress::class);
         $kernel->prependMiddleware(TrustEdgeHost::class);
 
         // Routes that go without a session: Route::withoutSession(fn () => ...) around a group, or

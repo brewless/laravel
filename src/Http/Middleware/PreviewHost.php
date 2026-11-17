@@ -21,7 +21,8 @@ use Symfony\Component\HttpFoundation\Response;
  * test address: its pages load their assets from where they came from, as a
  * strict Content-Security-Policy demands. Every answer carries `X-Robots-Tag: noindex,
  * nofollow`, and robots.txt disallows everything, whatever the application
- * serves there itself.
+ * serves there itself. A crawler asking any other page there does not get
+ * this far: LeaveContainerAddress sends it to the own domain first.
  *
  * On the test address the session cookie is a `__Host-` cookie: Secure, for
  * the whole path and for this exact name only. Every environment of every
@@ -44,7 +45,7 @@ final class PreviewHost
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $this->isPreview($request->getHost())) {
+        if (! self::isPreview($request->getHost())) {
             return $next($request);
         }
 
@@ -130,7 +131,8 @@ final class PreviewHost
         }
     }
 
-    private function isPreview(string $host): bool
+    /** Whether a hostname is a name under one of the test domains. */
+    public static function isPreview(string $host): bool
     {
         $host = strtolower(rtrim($host, '.'));
 

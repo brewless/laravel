@@ -3,6 +3,19 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.10.0 (17 November 2026)
+
+- **Crawlers are sent from the addresses outside the edge to the real domain.** The web container
+  also answers on its own address at Scaleway (`*.functions.fnc.<region>.scw.cloud`) and on the
+  test address, and nothing keeps an answer there, so a crawler on either wakes the container: on
+  coding.agency crawlers asked a page there about every three minutes and the container never
+  slept. On the container's own address a `GET` or `HEAD` without a valid edge secret now gets a
+  `301` to the same path and query on the host of `APP_URL`, with `noindex` and
+  `Cache-Control: public, max-age=86400`, and `robots.txt` there disallows everything. On the test
+  address only a crawler, known by its user agent, gets that `301`; people get the application as
+  before. `/_ops/*`, `POST /` and every other method other than `GET` and `HEAD` are left alone,
+  and nothing changes without an edge secret or where `APP_URL` names no other host.
+
 ## 1.9.1 (15 November 2026)
 
 - **The tests pass on Laravel 12 again.** The test for a cookie one page queued (1.6.3) took guests
