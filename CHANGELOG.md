@@ -5,10 +5,11 @@ route or a setting only changes in a major version.
 
 ## 1.10.1 (21 November 2026)
 
-- **PHP 8.6.** The package is tested on PHP 8.6 (released on 19 November 2026) with Laravel 12 and
-  13, next to 8.3, 8.4 and 8.5, and Brewless builds for it: `php: "8.6"` in `brewless.yml`. The
-  skills for coding agents name 8.6 and say that a project that names no version is built for 8.4.
-  Nothing changes for an application that stays on its PHP version.
+- **PHP 8.6.** The package is tested on PHP 8.6 (released on 19 November 2026) with Laravel 13,
+  and on 8.5, next to 8.3 and 8.4, and Brewless builds for it: `php: "8.6"` in `brewless.yml`.
+  With Laravel 12 it is not tested on 8.6: the test tools for Laravel 12 do not install on PHP 8.6
+  yet. The skills for coding agents name 8.6 and say that a project that names no version is
+  built for 8.4. Nothing changes for an application that stays on its PHP version.
 
 ## 1.10.0 (17 November 2026)
 

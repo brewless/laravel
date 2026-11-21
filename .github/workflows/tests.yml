@@ -16,7 +16,8 @@ jobs:
           - { php: '8.4', laravel: '12.*' }
           - { php: '8.4', laravel: '13.*' }
           - { php: '8.5', laravel: '13.*' }
-          - { php: '8.6', laravel: '12.*' }
+          # PHP 8.6 with Laravel 13 only: the test tools for Laravel 12 (Testbench 10 with Pest 4)
+          # do not install on PHP 8.6 yet.
           - { php: '8.6', laravel: '13.*' }
     name: PHP ${{ matrix.php }}, Laravel ${{ matrix.laravel }}
     steps:
