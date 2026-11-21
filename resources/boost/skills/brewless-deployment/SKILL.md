@@ -41,7 +41,7 @@ A deploy first does what `brewless.yml` asks of the environment's resources:
 ## The steps of a release
 
 1. **Source.** The commit is packed and uploaded to a private bucket in the customer's project.
-2. **Build.** A Serverless Job runs `composer install --no-dev` and `npm ci && npm run build`, then the `build` commands of `brewless.yml`. It builds for the `php` version of `brewless.yml` (default 8.4).
+2. **Build.** A Serverless Job runs `composer install --no-dev` and `npm ci && npm run build`, then the `build` commands of `brewless.yml`. It builds for the `php` version of `brewless.yml`: 8.3, 8.4, 8.5 or 8.6, and 8.4 when the file names none.
 3. **Migrate.** The release container runs the release commands (`migrate --force` by default, or `release` in `brewless.yml`) before anything changes for visitors.
 4. **Activate.** The web container switches to the new image and has to answer healthy on `/up`. A redirect counts as unhealthy.
 5. **Workers, edge, built files.** The worker and schedule follow, and the bunny.net edge forgets the pages of the previous image.
@@ -54,7 +54,7 @@ One release at a time per environment. A failed release never goes live: the pre
 organisation: acme
 application: shop
 framework: laravel
-php: "8.4"
+php: "8.6"
 default-environment: staging
 build:
   - npm run docs          # after the framework's own build steps

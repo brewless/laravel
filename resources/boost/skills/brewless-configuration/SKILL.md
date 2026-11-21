@@ -61,7 +61,7 @@ Do not set these by hand; Brewless writes them on every deploy:
 organisation: acme
 application: shop
 framework: laravel
-php: "8.4"                 # 8.3, 8.4 or 8.5
+php: "8.6"                 # 8.3, 8.4, 8.5 or 8.6; left out: 8.4
 environments:
   production:
     kind: production       # production, staging or development

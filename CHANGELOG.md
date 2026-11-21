@@ -3,6 +3,13 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.10.1 (21 November 2026)
+
+- **PHP 8.6.** The package is tested on PHP 8.6 (released on 19 November 2026) with Laravel 12 and
+  13, next to 8.3, 8.4 and 8.5, and Brewless builds for it: `php: "8.6"` in `brewless.yml`. The
+  skills for coding agents name 8.6 and say that a project that names no version is built for 8.4.
+  Nothing changes for an application that stays on its PHP version.
+
 ## 1.10.0 (17 November 2026)
 
 - **Crawlers are sent from the addresses outside the edge to the real domain.** The web container
