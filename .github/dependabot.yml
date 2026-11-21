@@ -1,0 +1,11 @@
+# The actions are taken by commit, so they do not move by themselves. Dependabot proposes the new
+# commit, as a pull request that runs the tests first.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
