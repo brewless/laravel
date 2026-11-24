@@ -290,7 +290,12 @@ final class Runtime
         $started = microtime(true);
         $name = strtok(trim($command), ' ') ?: '';
 
-        if ($name === '' || in_array($name, (array) config('brewless.ops.never_ending'), true)) {
+        // Tinker with --execute runs the code it is given and ends; only the shell that waits for typing never does.
+        if ($name === 'tinker' && ! self::executesCode($command)) {
+            return ['exit_code' => 1, 'output' => 'Tinker only runs here with code to execute: tinker --execute="…", or brewless tinker <environment> "<php>". An interactive shell never ends by itself.', 'seconds' => 0.0, 'refused' => true];
+        }
+
+        if ($name === '' || ($name !== 'tinker' && in_array($name, (array) config('brewless.ops.never_ending'), true))) {
             return ['exit_code' => 1, 'output' => '', 'seconds' => 0.0, 'refused' => true];
         }
 
@@ -310,6 +315,15 @@ final class Runtime
             'seconds' => round(microtime(true) - $started, 2),
             'refused' => false,
         ];
+    }
+
+    /**
+     * Whether a tinker line hands it code to run (`--execute=…` or
+     * `--execute …` with something after it), so it ends by itself.
+     */
+    private static function executesCode(string $command): bool
+    {
+        return preg_match('/^tinker\s+(?:.*\s)?--execute(?:=|\s+)\S/', trim($command)) === 1;
     }
 
     /**

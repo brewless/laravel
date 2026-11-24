@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Laravel\Tinker\TinkerServiceProvider;
 
 uses(TestCase::class);
 
@@ -163,6 +164,33 @@ test('a command that never ends, is unknown or is not one line does not run', fu
     $this->postJson('/_ops/command', ['command' => 'nope:nothing'], $this->ops())->assertOk()->assertJsonPath('exit_code', 1)->assertJsonPath('refused', false);
     $this->postJson('/_ops/command', ['command' => "about\nmigrate:fresh"], $this->ops())->assertUnprocessable();
     $this->postJson('/_ops/command', [], $this->ops())->assertUnprocessable();
+});
+
+test('tinker runs the code it is given and ends, an interactive tinker is refused with what to do instead', function (): void {
+    // An application has tinker from laravel/tinker; the test application gets it here.
+    $this->app->register(TinkerServiceProvider::class);
+    // Tinker reads the class map from the application's vendor directory; the test application keeps it in the package's.
+    putenv('COMPOSER_VENDOR_DIR='.dirname(__DIR__, 2).'/vendor');
+
+    $this->postJson('/_ops/command', ['command' => 'tinker --execute="echo config(\'app.name\').\'-\'.(6 * 7);"'], $this->ops())
+        ->assertOk()
+        ->assertJsonPath('refused', false)
+        ->assertJsonPath('exit_code', 0)
+        ->assertSee('Laravel-42');
+
+    $this->postJson('/_ops/command', ['command' => 'tinker --execute="throw new RuntimeException(\'out of coffee\');"'], $this->ops())
+        ->assertOk()
+        ->assertJsonPath('exit_code', 1)
+        ->assertSee('out of coffee');
+
+    foreach (['tinker', 'tinker --execute', 'tinker --execute=', 'tinker app.php'] as $interactive) {
+        $this->postJson('/_ops/command', ['command' => $interactive], $this->ops())
+            ->assertOk()
+            ->assertJsonPath('refused', true)
+            ->assertSee('brewless tinker');
+    }
+
+    putenv('COMPOSER_VENDOR_DIR');
 });
 
 test('an address that keeps guessing gets the same 404, and the guesses are counted', function (): void {

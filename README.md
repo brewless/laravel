@@ -85,9 +85,12 @@ A failure is answered with `ok: false` and reported to the application's
 log, never with its reason; a release command that fails is named, so
 Brewless can say which one stopped the release.
 
-Commands that never return (`queue:work`, `tinker`, `serve`, …) and commands
-that throw data away (`migrate:fresh`, `db:wipe`, …) are refused on
-`/_ops/command`, and as release commands sent along with a release.
+Commands that never return (`queue:work`, `serve`, an interactive `tinker`,
+…) and commands that throw data away (`migrate:fresh`, `db:wipe`, …) are
+refused on `/_ops/command`, and as release commands sent along with a
+release. `tinker --execute="…"` runs the code it is given and ends, so it
+does run on `/_ops/command` (`brewless tinker <environment> "<php>"` in the
+CLI), within the same 50 seconds as any command.
 Brewless sends the release commands and queues of your project's
 `brewless.yml`; without them the commands of `ops.release_commands` and the
 default queue are used. Every wrong secret gets the same 404 and is counted

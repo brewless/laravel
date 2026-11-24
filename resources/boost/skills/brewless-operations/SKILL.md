@@ -37,8 +37,9 @@ brewless command production "cache:clear"     # asks for confirmation on product
 - Give the artisan command without `php artisan`, on one line. It runs in the environment's own container on the live release and has **50 seconds**. Longer work belongs in a queued job.
 - **Ask the user before you run anything on production**, and never add `--force` yourself.
 - Prefer read-only commands such as `migrate:status`, `about` or `schedule:list` when investigating.
+- A line of PHP runs with `brewless tinker <environment> "<php>"`, for example `brewless tinker staging "App\\Models\\User::count()"`. It is `tinker --execute` underneath: the value of the last expression is printed, an exception gives exit code 1, and the same 50 seconds apply. It runs against real data, so the same care applies as for any command: read before you change, and ask first on production.
 - These are refused:
-  - commands that never end: `tinker`, `serve`, `queue:work`, `queue:listen`, `schedule:work`, `pail`, `horizon`, `reverb:start`, `octane:start`, `dev`;
+  - commands that never end: an interactive `tinker` (without `--execute`), `serve`, `queue:work`, `queue:listen`, `schedule:work`, `pail`, `horizon`, `reverb:start`, `octane:start`, `dev`;
   - commands that throw data away: `db:wipe`, `migrate:fresh`, `migrate:refresh`, `migrate:reset`, `migrate:rollback`.
 - Brewless keeps the command's name in the audit trail, never its arguments or output.
 

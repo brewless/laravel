@@ -3,6 +3,16 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.11.0 (24 November 2026)
+
+- **Tinker with code runs over the command route.** `tinker --execute="…"` runs the code it is
+  given and ends, so `/_ops/command` no longer refuses it: `brewless tinker <environment> "<php>"`
+  (CLI 1.x and later) or `brewless command <environment> 'tinker --execute="…"'`. It has the same 50
+  seconds and the same output limit as any command, an exception gives exit code 1 with its
+  message, and Brewless keeps only the name `tinker` in the audit trail, never the code. An
+  interactive `tinker` is still refused, now with a line that says what to use instead. Release
+  commands are unchanged: tinker is not one.
+
 ## 1.10.1 (21 November 2026)
 
 - **PHP 8.6.** The package is tested on PHP 8.6 (released on 19 November 2026) with Laravel 13,

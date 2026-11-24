@@ -18,7 +18,7 @@ const GUIDELINES_PATH = __DIR__.'/../../resources/boost/guidelines';
  */
 const CLI_COMMANDS = [
     'login', 'logout', 'init', 'deploy', 'plan', 'service:push', 'releases', 'rollback', 'env:pull', 'env:push',
-    'provision', 'domain:add', 'dns:list', 'dns:add', 'dns:update', 'dns:remove', 'scale', 'command', 'logs', 'export', 'detach',
+    'provision', 'domain:add', 'dns:list', 'dns:add', 'dns:update', 'dns:remove', 'scale', 'command', 'tinker', 'logs', 'export', 'detach',
     'edge:rotate-secret',
 ];
 
