@@ -3,6 +3,14 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.11.1 (24 November 2026)
+
+- **Tinker prints the value of the last expression.** `brewless tinker production "App\\Models\\User::count()"`
+  now prints `= 42`, as tinker does at its prompt; Laravel's own `tinker --execute` printed only
+  what the code echoes. With laravel/tinker installed the package registers a hidden
+  `brewless:tinker` for this, and the command route runs a `tinker --execute` line through it. An
+  interactive `brewless:tinker` is refused the same as `tinker`. `php artisan tinker` is unchanged.
+
 ## 1.11.0 (24 November 2026)
 
 - **Tinker with code runs over the command route.** `tinker --execute="…"` runs the code it is

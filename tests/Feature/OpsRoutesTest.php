@@ -178,12 +178,18 @@ test('tinker runs the code it is given and ends, an interactive tinker is refuse
         ->assertJsonPath('exit_code', 0)
         ->assertSee('Laravel-42');
 
+    // The value of the last expression is printed, as at tinker's prompt.
+    $this->postJson('/_ops/command', ['command' => 'tinker --execute="$order = [\'paid\' => false]; 6 * 7"'], $this->ops())
+        ->assertOk()
+        ->assertJsonPath('exit_code', 0)
+        ->assertJsonPath('output', "= 42\n");
+
     $this->postJson('/_ops/command', ['command' => 'tinker --execute="throw new RuntimeException(\'out of coffee\');"'], $this->ops())
         ->assertOk()
         ->assertJsonPath('exit_code', 1)
         ->assertSee('out of coffee');
 
-    foreach (['tinker', 'tinker --execute', 'tinker --execute=', 'tinker app.php'] as $interactive) {
+    foreach (['tinker', 'tinker --execute', 'tinker --execute=', 'tinker app.php', 'brewless:tinker', 'brewless:tinker --execute='] as $interactive) {
         $this->postJson('/_ops/command', ['command' => $interactive], $this->ops())
             ->assertOk()
             ->assertJsonPath('refused', true)

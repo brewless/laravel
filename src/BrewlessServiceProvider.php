@@ -8,6 +8,7 @@ use Brewless\Laravel\Cache\LockingStorageStore;
 use Brewless\Laravel\Capacity\CapacityApi;
 use Brewless\Laravel\Capacity\CapacityClient;
 use Brewless\Laravel\Console\SleepCommand;
+use Brewless\Laravel\Console\TinkerLineCommand;
 use Brewless\Laravel\Database\MySqlConnection;
 use Brewless\Laravel\Database\PersistentConnections;
 use Brewless\Laravel\Database\PostgresConnection;
@@ -45,6 +46,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Laravel\Tinker\Console\TinkerCommand;
 use PDO;
 
 final class BrewlessServiceProvider extends ServiceProvider
@@ -291,6 +293,11 @@ final class BrewlessServiceProvider extends ServiceProvider
         // ops route, where that is false. Registering only tells Artisan the name; the command
         // itself is built when it runs.
         $this->commands([SleepCommand::class]);
+
+        // The tinker `brewless tinker` runs: the value of the last expression is printed. Only with laravel/tinker.
+        if (class_exists(TinkerCommand::class)) {
+            $this->commands([TinkerLineCommand::class]);
+        }
 
         // `@webmcp` in a layout: the WebMCP tools of WebMcp, and the script that registers them.
         // Only where the application renders Blade.

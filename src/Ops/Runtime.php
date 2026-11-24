@@ -291,11 +291,11 @@ final class Runtime
         $name = strtok(trim($command), ' ') ?: '';
 
         // Tinker with --execute runs the code it is given and ends; only the shell that waits for typing never does.
-        if ($name === 'tinker' && ! self::executesCode($command)) {
+        if (in_array($name, ['tinker', 'brewless:tinker'], true) && ! self::executesCode($command)) {
             return ['exit_code' => 1, 'output' => 'Tinker only runs here with code to execute: tinker --execute="…", or brewless tinker <environment> "<php>". An interactive shell never ends by itself.', 'seconds' => 0.0, 'refused' => true];
         }
 
-        if ($name === '' || ($name !== 'tinker' && in_array($name, (array) config('brewless.ops.never_ending'), true))) {
+        if ($name === '' || (! in_array($name, ['tinker', 'brewless:tinker'], true) && in_array($name, (array) config('brewless.ops.never_ending'), true))) {
             return ['exit_code' => 1, 'output' => '', 'seconds' => 0.0, 'refused' => true];
         }
 
@@ -305,6 +305,11 @@ final class Runtime
 
         if (! array_key_exists($name, Artisan::all())) {
             return ['exit_code' => 1, 'output' => 'Command "'.$name.'" is not defined.', 'seconds' => 0.0, 'refused' => false];
+        }
+
+        // Brewless's tinker for one line prints the value of the last expression too, as tinker does at its prompt.
+        if ($name === 'tinker' && array_key_exists('brewless:tinker', Artisan::all())) {
+            $command = 'brewless:tinker'.substr(trim($command), strlen('tinker'));
         }
 
         $exitCode = Artisan::call($command.' --no-interaction');
@@ -323,7 +328,7 @@ final class Runtime
      */
     private static function executesCode(string $command): bool
     {
-        return preg_match('/^tinker\s+(?:.*\s)?--execute(?:=|\s+)\S/', trim($command)) === 1;
+        return preg_match('/^(?:brewless:)?tinker\s+(?:.*\s)?--execute(?:=|\s+)\S/', trim($command)) === 1;
     }
 
     /**
