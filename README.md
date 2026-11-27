@@ -3,8 +3,8 @@
 What a Laravel application needs to run on [Brewless](https://brewless.eu).
 It runs in **your** containers, in your own cloud account, and keeps working
 when you stop using Brewless. It calls Brewless only when your application
-asks it for a database per tenant (see below); otherwise it sends nothing
-anywhere.
+asks it for a database per tenant, a capacity boost or a malware scan (see
+below); otherwise it sends nothing anywhere.
 
 ```bash
 composer require brewless/laravel
@@ -596,6 +596,93 @@ $capacity->markReady('event-7-sale');    // ready() is false until a test says s
 $capacity->unreachable();                // every call throws CapacityUnreachable
 ```
 
+### Malware Protection
+
+Brewless Malware Protection scans every bucket of the account with ClamAV,
+in your own Scaleway account, once the owner switches it on in the console.
+**That needs nothing in the application.** The package is for an application
+that wants to act on what was found: read a file's status, ask for a scan
+now, wait for one, hold uploads until they are clean, and hear of what was
+found.
+
+The scanner writes three tags on every object it scanned: `brewless-av`
+(`clean`, `infected`, `unsupported` or `failed`), `brewless-av-etag` (the ETag
+it scanned) and `brewless-av-at`. `Antivirus` reads them through the disk's own
+S3 client, with the disk's `root` in front of the path, so a status costs two
+requests to the bucket and none to Brewless. A tag is believed only for the
+ETag it was written for: a file written again is pending until it is
+scanned, never clean.
+
+```php
+use Brewless\Laravel\Facades\Antivirus;
+
+$result = Antivirus::disk('s3')->status('avatars/1.png'); // Antivirus::status() uses the default disk
+
+if ($result->isInfected()) {
+    // isClean(), isPending(), isUnsupported(), isFailed(), status(), scannedAt(), etag()
+}
+
+Antivirus::disk('s3')->requestScan('avatars/1.png');      // now, instead of within minutes
+$result = Antivirus::disk('s3')->wait('avatars/1.png', 60); // looks again after 1, 2, 4, 8, 10 … seconds
+```
+
+`requestScan()` posts the bucket and key to `/api/runtime/malware/scans`,
+signed like the capacity client, with `BREWLESS_API_URL`,
+`BREWLESS_ENVIRONMENT` and `BREWLESS_MALWARE_KEY`; the console shows the key
+when the owner switches it on. Asking twice queues the file once. `wait()`
+never takes longer than its timeout and gives the last result, still pending
+when the time ran out: wait in a queued job, not in a web request. A file
+that is not there throws `FileNotFound`, a bucket that cannot be read a
+`MalwareException`. An object that already has ten tags has no room for the
+scanner's and stays pending here.
+
+**Protection mode.** For a bucket the console puts in protection mode, the
+application uploads under the staging prefix (`incoming/`,
+`BREWLESS_MALWARE_STAGING_PREFIX`) and reads only outside it. A clean upload
+is moved to the path without the prefix, an infected one is taken away, and
+one that could not be scanned stays under the prefix. Brewless does not stop
+a read under the prefix; your code must not do one.
+
+```php
+$scanner = Antivirus::disk('s3');
+Storage::disk('s3')->put($scanner->stagingPath('avatars/1.png'), $contents); // incoming/avatars/1.png
+
+// later, in a job:
+$scanner->release('avatars/1.png'); // true once the clean copy is at avatars/1.png
+```
+
+The prefix sits at the front of the bucket's key, so upload through a disk
+without a `root`; `stagingPath()` throws for a disk with one.
+
+**Events.** Brewless forwards what each scan found in the application's
+buckets to `POST /_ops/malware`, behind the ops secret. Every reported file
+fires `Brewless\Laravel\Malware\FileScanned`, and an infected or quarantined
+one `MalwareDetected` as well; a report names only infected, quarantined,
+unsupported and failed files. The `finding` names the bucket and key, and the
+disk and path when a disk of the application has that bucket. A report that
+is not as expected is refused whole, and only the rule it broke is logged:
+a filename can be personal data.
+
+```php
+use Brewless\Laravel\Malware\MalwareDetected;
+use Illuminate\Support\Facades\Event;
+
+Event::listen(MalwareDetected::class, function (MalwareDetected $event): void {
+    // $event->finding->disk, ->path, ->signature, ->staged, ->quarantined()
+});
+```
+
+In the application's own tests nothing is read or sent:
+
+```php
+$antivirus = Antivirus::fake();                 // every file pending until it is marked
+$antivirus->markClean('a.png')->markInfected('b.png', 'Win.Test.EICAR_HDB-1');
+$antivirus->markUnsupported('c.zip', disk: 'tenants');
+
+$antivirus->assertScanRequested('a.png');
+$antivirus->assertNothingRequested();
+```
+
 ### Mail
 
 With Scaleway Transactional Email as the mailer (`mail` in `brewless.yml`, the default of a production environment with a domain), the package does two things, each only when Brewless gave the container its variables:
@@ -712,6 +799,7 @@ With [Laravel Boost](https://laravel.com/docs/boost) there is nothing to do. Run
 | `brewless-operations` | `resources/boost/skills/` | Logs, running a command, queues and the schedule, scaling, domains and DNS |
 | `brewless-databases` | `resources/boost/skills/` | Databases, migrations, queues, buckets, backups, the cache, and a database per tenant |
 | `brewless-sleep` | `resources/boost/skills/` | Why a container never sleeps, what `brewless:sleep` reports, and what to do about each finding |
+| `brewless-malware` | `resources/boost/skills/` | A file's scan status, a scan now, the staging prefix of protection mode, and the events of Malware Protection |
 
 The guideline goes into your `AGENTS.md` or `CLAUDE.md`. The skills go into `.agents/skills`, `.claude/skills`, `.cursor/skills` and so on, one folder per agent. A skill is loaded only when the task calls for it.
 
@@ -755,6 +843,8 @@ The skills follow the [Agent Skills](https://agentskills.io) format: a folder pe
 | `SQS_ACCESS_KEY_ID`, `SQS_SECRET_ACCESS_KEY`, `SQS_ENDPOINT` | The key and address of a queue at Scaleway Queues; handed to the `sqs` connection, which otherwise shares `AWS_*` with the `s3` disk |
 | `BREWLESS_API_URL`, `BREWLESS_ENVIRONMENT`, `BREWLESS_DATABASES_KEY` | Where and as which environment to ask Brewless for a database per tenant, and the key to sign with; set by Brewless with `databases` in `brewless.yml` |
 | `BREWLESS_CAPACITY_KEY` | The key to sign capacity boosts with (with `BREWLESS_API_URL` and `BREWLESS_ENVIRONMENT`); shown once in the Brewless console when the owner switches it on |
+| `BREWLESS_MALWARE_KEY` | The key to sign a request for a malware scan with (with `BREWLESS_API_URL` and `BREWLESS_ENVIRONMENT`); shown in the Brewless console |
+| `BREWLESS_MALWARE_STAGING_PREFIX` | Where uploads wait in a bucket in protection mode (`incoming/`); the prefix the console names for that bucket |
 | `BREWLESS_DB_RETRY_SECONDS` | How long a query whose connection went away is tried again (`60`); `0` keeps Laravel's single try |
 | `BREWLESS_DB_PERSISTENT` | Keep the database connections open between requests (`false`) |
 | `REVERB_ALLOWED_ORIGINS` | Comma-separated hostnames whose pages may connect to Reverb; set by Brewless with `realtime` in `brewless.yml`. `*` allows every origin |

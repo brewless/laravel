@@ -47,7 +47,7 @@ function skillParts(string $directory): array
 }
 
 test('the package ships skills and a guideline where Laravel Boost looks for them', function (): void {
-    expect(skillDirectories())->toHaveKeys(['brewless-deployment', 'brewless-configuration', 'brewless-operations', 'brewless-databases', 'brewless-sleep'])
+    expect(skillDirectories())->toHaveKeys(['brewless-deployment', 'brewless-configuration', 'brewless-operations', 'brewless-databases', 'brewless-sleep', 'brewless-malware'])
         ->and(GUIDELINES_PATH.'/core.md')->toBeFile();
 });
 

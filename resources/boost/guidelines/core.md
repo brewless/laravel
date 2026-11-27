@@ -15,4 +15,4 @@ This application is deployed with [Brewless](https://brewless.eu): serverless co
 - **Migrations run as release commands** before a release goes live (`migrate --force` by default, or `release` in `brewless.yml`), never by hand in a container.
 - A variable change reaches the containers with the **next deploy**, not before.
 
-Use the `brewless-deployment`, `brewless-configuration`, `brewless-operations`, `brewless-databases` and `brewless-sleep` skills for the details.
+Use the `brewless-deployment`, `brewless-configuration`, `brewless-operations`, `brewless-databases`, `brewless-sleep` and `brewless-malware` skills for the details.

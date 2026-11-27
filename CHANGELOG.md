@@ -3,6 +3,23 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
+## 1.12.0 (unreleased)
+
+- **Malware Protection from the application.** Brewless scans every bucket of the account by
+  itself; nothing in the application is needed for that. For an application that wants to act on
+  what was found there is now `Brewless\Laravel\Facades\Antivirus` (the first facade of the
+  package): `Antivirus::disk('s3')->status($path)` reads the scanner's tags through the disk's own S3
+  client and gives a `ScanResult` (`isClean()`, `isInfected()`, `isPending()`, `isUnsupported()`,
+  `isFailed()`, `scannedAt()`); a tag counts only for the ETag it was written for, so a file
+  written again is pending, never clean. `requestScan($path)` asks Brewless for a scan now
+  (`POST /api/runtime/malware/scans`, signed with `BREWLESS_MALWARE_KEY`), `wait($path, $timeout)`
+  looks again with a growing pause and never past the timeout, and for a bucket in protection mode
+  `stagingPath($path)` names where to upload (`incoming/`, `BREWLESS_MALWARE_STAGING_PREFIX`) and
+  `release($path)` says whether the clean copy was moved out. `POST /_ops/malware`, behind the ops
+  secret, turns the findings Brewless forwards into `FileScanned` and `MalwareDetected` events.
+  `Antivirus::fake()` for the application's own tests, and a `brewless-malware` skill for coding
+  agents. Nothing changes for an application that does not use it.
+
 ## 1.11.1 (24 November 2026)
 
 - **Tinker prints the value of the last expression.** `brewless tinker production "App\\Models\\User::count()"`

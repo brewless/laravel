@@ -14,6 +14,7 @@ use Brewless\Laravel\Database\PersistentConnections;
 use Brewless\Laravel\Database\PostgresConnection;
 use Brewless\Laravel\Databases\DatabaseClient;
 use Brewless\Laravel\Http\Controllers\MailEventsController;
+use Brewless\Laravel\Http\Controllers\MalwareFindingsController;
 use Brewless\Laravel\Http\Controllers\OpsController;
 use Brewless\Laravel\Http\Controllers\SecurityTxtController;
 use Brewless\Laravel\Http\Middleware\CacheAtEdge;
@@ -23,6 +24,9 @@ use Brewless\Laravel\Http\Middleware\PreviewHost;
 use Brewless\Laravel\Http\Middleware\StartSessionWhenNeeded;
 use Brewless\Laravel\Http\Middleware\TrustEdgeHost;
 use Brewless\Laravel\Mail\MailCopies;
+use Brewless\Laravel\Malware\Antivirus;
+use Brewless\Laravel\Malware\AntivirusApi;
+use Brewless\Laravel\Malware\ScanRequests;
 use Brewless\Laravel\Queue\SignedDatabaseConnector;
 use Brewless\Laravel\Queue\SignedSqsConnector;
 use Brewless\Laravel\Realtime\AllowedOrigins;
@@ -32,6 +36,7 @@ use Illuminate\Cache\CacheManager;
 use Illuminate\Cache\Repository;
 use Illuminate\Cache\StorageStore;
 use Illuminate\Contracts\Cache\Factory as CacheFactory;
+use Illuminate\Contracts\Filesystem\Factory as Filesystems;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Database\Connection;
@@ -108,6 +113,22 @@ final class BrewlessServiceProvider extends ServiceProvider
             array_values(array_map(intval(...), (array) config('brewless.capacity.retry_milliseconds', [500, 1000, 2000]))),
         ));
         $this->app->bind(CapacityApi::class, CapacityClient::class);
+
+        // Malware Protection for the application's disks, behind the Antivirus facade. Read when it is asked for.
+        $this->app->bind(ScanRequests::class, static fn (Application $app): ScanRequests => new ScanRequests(
+            $app->make(Factory::class),
+            self::setting('brewless.malware.url'),
+            self::setting('brewless.malware.environment'),
+            self::setting('brewless.malware.key'),
+            (int) config('brewless.malware.timeout', 10),
+            (int) config('brewless.malware.connect_timeout', 5),
+            array_values(array_map(intval(...), (array) config('brewless.malware.retry_milliseconds', [500, 1000, 2000]))),
+        ));
+        $this->app->bind(AntivirusApi::class, static fn (Application $app): Antivirus => new Antivirus(
+            $app->make(Filesystems::class),
+            $app->make(ScanRequests::class),
+            self::setting('brewless.malware.staging_prefix') ?? 'incoming/',
+        ));
     }
 
     /**
@@ -280,7 +301,7 @@ final class BrewlessServiceProvider extends ServiceProvider
     {
         $defaults = require __DIR__.'/../config/brewless.php';
 
-        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases', 'capacity', 'database', 'mail'] as $section) {
+        foreach (['ops', 'edge', 'preview', 'queue', 'redis', 'databases', 'capacity', 'malware', 'database', 'mail'] as $section) {
             config(['brewless.'.$section => array_replace($defaults[$section], (array) config('brewless.'.$section))]);
         }
     }
@@ -389,6 +410,8 @@ final class BrewlessServiceProvider extends ServiceProvider
             Route::post('/_ops/queue/retry', [OpsController::class, 'retryFailed'])->name('brewless.ops.queue.retry');
             Route::post('/_ops/command', [OpsController::class, 'command'])->name('brewless.ops.command');
             Route::get('/_ops/status', [OpsController::class, 'status'])->name('brewless.ops.status');
+            // What the scanner of Malware Protection found in the application's buckets, forwarded by Brewless.
+            Route::post('/_ops/malware', MalwareFindingsController::class)->name('brewless.ops.malware');
             // A trigger of the provider can only post a body to the root of a container.
             Route::post('/', [OpsController::class, 'trigger'])->name('brewless.ops.trigger');
         });
