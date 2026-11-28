@@ -3,7 +3,7 @@
 Versions follow [semantic versioning](https://semver.org): from 1.0 on, a
 route or a setting only changes in a major version.
 
-## 1.12.0 (unreleased)
+## 1.12.0 (2026-11-28)
 
 - **Malware Protection from the application.** Brewless scans every bucket of the account by
   itself; nothing in the application is needed for that. For an application that wants to act on
